@@ -61,6 +61,12 @@ From an audit of six repositories that ran v1–v3.
   last tidy (entries + 3 x merges + commits / 5) passes `TIDY_VOLUME` over `TIDY_MIN_DAYS`, or
   three times it in any span.
 - `Supersedes: <old> by <new>` folds a duplicate into its survivor.
+- The report shows each open item that mirrors another register's item (`EXTERNAL_IDS`) beside
+  that register's own status, and proposes closing it only when every item it cites is closed.
+- The gate rejects a new entry that reads like a live one (same similarity test as the report)
+  unless the commit `Refs:`/`Supersedes:` it — duplicates are stopped where they are born. A
+  `Tidy:` commit is exempt. An open list over the digest cap no longer re-triggers "tidy due"
+  the day after a tidy that reviewed it.
 
 **From the cloud review of v3** (`44eeae6`, never merged): new entries are inserted by date, so
 late arrivals (a merge, a recovery) keep the file newest-first; an unchanged dashboard block is

@@ -504,6 +504,40 @@ hc "$X" -m "x" -m "Refs: C-022"
 check "without EXTERNAL_IDS, an unknown id is rejected" "grep -q 'no entry C-022' '$WORK/err'"
 
 # ---------------------------------------------------------------------------
+echo "13e. duplicates are stopped at the gate; a tidy that leaves the list long is not re-nagged"
+DU="$(newrepo dups)"; installed "$DU"
+hc "$DU" -m "plan" -m "Decision: every declared input and every decision is a field of one DesignDecisions record that travels from design to results"
+hc "$DU" -m "enact" -m "Decision: every declared input and every design decision is a field of one frozen DesignDecisions record that travels design to results"
+check "a restated decision is rejected, naming the one it restates" "grep -q \"reads like $(hid D 'every declared input and every decision is a field of one DesignDecisions record that travels from design to results')\" '$WORK/err'"
+hc "$DU" -m "enact" -m "Refs: $(hid D 'every declared input and every decision is a field of one DesignDecisions record that travels from design to results')"
+check "…Refs: is the way to say it enacts it" "[ \$? -eq 0 ]"
+hc "$DU" -m "refine" -m "Decision: every declared input and every design decision is a field of one frozen DesignDecisions record that travels design to results
+Refs: $(hid D 'every declared input and every decision is a field of one DesignDecisions record that travels from design to results')"
+check "…and a new entry that names it passes" "[ \$? -eq 0 ]"
+hc "$DU" -m "decide: unrelated" -m "Decision: interview loop is two rounds with no take-home"
+check "an unrelated decision is not blocked" "[ \$? -eq 0 ]"
+CAP="$(newrepo cap)"; installed "$CAP"
+for i in $(seq 1 25); do commit "$CAP" "o$i
+
+Opens: overflow problem number $i needing attention"; done
+sync_ "$CAP"
+hc "$CAP" -m "chore(ledger): tidy" -m "Tidy: reviewed, all 25 are real"
+check "right after a tidy, a long open list is not 'tidy due' again" "[ -z \"\$(CLAUDE_PROJECT_DIR='$CAP' python3 '$CAP/.claude/hooks/_ledger_parse.py' tidy-status '$CAP/LEDGER.md' '$CAP')\" ]"
+MI="$(newrepo mirrors)"
+printf '# Concerns\n\n## C-101 · the cache leaks\n- **Status.** Closed — fixed in the loader.\n\n## C-102 · the queue stalls\n- **Status.** Open.\n' > "$MI/CONCERNS.md"
+git -C "$MI" add CONCERNS.md; commit "$MI" "docs: concerns"
+printf 'EXTERNAL_IDS=C\n' > /dev/null; installed "$MI"
+echo 'EXTERNAL_IDS=C' >> "$MI/.claude/ledger.conf"
+commit "$MI" "x
+
+Opens: C-101 -- the cache leaks memory on every reload
+Opens: C-102 -- the queue stalls under back-pressure"
+sync_ "$MI"
+REP="$(CLAUDE_PROJECT_DIR="$MI" python3 "$MI/.claude/hooks/_ledger_parse.py" tidy-report "$MI/LEDGER.md" "$MI")"
+check "report: a mirror whose concern is closed there → close here" "printf '%s' \"\$REP\" | grep 'C-101' | grep -q 'CLOSE here too'"
+check "report: a mirror still open there → keep" "printf '%s' \"\$REP\" | grep 'C-102' | grep -q 'still open there'"
+
+# ---------------------------------------------------------------------------
 echo "14. the user-level session hook"
 SESS="$SKILL/bin/ledger-session.sh"
 NL="$(newrepo noledger)"

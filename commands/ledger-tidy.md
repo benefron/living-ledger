@@ -23,7 +23,8 @@ python3 .claude/hooks/_ledger_parse.py tidy-report <ledger> "$(git rev-parse --s
 ```
 
 It lists candidates, each with the reason it was flagged: open items that read as settled,
-overdue or aging items, similar entries (duplicate, refinement or contradiction), empty entries,
+overdue or aging items, similar entries (duplicate, refinement or contradiction), open items that
+mirror another register's item (`EXTERNAL_IDS`) beside that register's own status, empty entries,
 long-pinned entries, recent decisions with no written reasoning, stale rules, lint, and other
 files in the repo that keep their own lists (retired framings, concerns, status docs). These are
 heuristics: read each entry (`grep -n -A6 '^## <id> '`) and, where needed, its commit
@@ -64,6 +65,10 @@ git commit -m "chore(ledger): tidy" \
 Supersedes: D-… by D-…
 Tidy: <n> closed, <n> settled, <n> duplicates folded, <n> rules fixed"
 ```
+
+Put `Area: -` (or the right workstream) before the first entry trailer when the tidy records new
+entries, so they do not inherit the area of whatever files the tidy touched. A `Tidy:` commit is
+exempt from the gate's near-duplicate check — a person just reviewed it.
 
 `Tidy:` is what the next "tidy due" check counts from; every tidy commit carries it (even when
 nothing but hand edits changed). The post-commit hook applies the `Closes:`/`Supersedes:` lines

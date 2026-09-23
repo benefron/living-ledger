@@ -642,6 +642,31 @@ def check_msg(msgfile, root):
                                 "words>`.")
         elif key in ('Due', 'Date') and not re.fullmatch(r'\d{4}-\d{2}-\d{2}', val):
             problems.append(f"`{key}: {val}` must be a date, YYYY-MM-DD.")
+    # a new entry that reads like a live one is how duplicates are born (the planned decision,
+    # then the same decision again when enacted): the commit must say how they relate
+    if entries and ledger and os.path.exists(ledger) and not any(
+            l.startswith('Tidy:') for l in tl):
+        mentioned = set()
+        for line in tl:
+            k, _, v = line.partition(':')
+            if k in RELATE_KEYS:
+                mentioned.update(ID_RE.findall(v))
+        live = [e for e in parse_entries(ledger) if not is_dead(e)]
+        for line in tl:
+            k, _, v = line.partition(':')
+            if k not in KINDS or not v.strip():
+                continue
+            typ = KINDS[k][1]
+            tv = _toks(v)
+            for e in live:
+                if e['type'] == typ and e['id'] not in mentioned and similar(tv, _toks(entry_text(e))):
+                    problems.append(
+                        f"`{k}: {v.strip()[:60]}` reads like {e['id']} (\"{entry_text(e)[:70]}\"). "
+                        f"If this commit enacts or extends it: `Refs: {e['id']}` instead of a new entry. "
+                        f"If it replaces it: keep the entry and add `Supersedes: {e['id']}`. If it is "
+                        f"genuinely different: keep the entry and add `Refs: {e['id']}` to show you checked.")
+                    break
+
     if not problems and not (entries or related):
         problems.append("this commit does not relate to the ledger.")
     return problems
@@ -722,7 +747,10 @@ def tidy_status(ledger, root, max_open=22):
     except ValueError:
         min_days, vol_need = 7, 25
     volume = len(new) + 3 * merges + commits // 5
-    due = (days >= min_days and volume >= vol_need) or volume >= 3 * vol_need or openi > max_open
+    # an open list over the digest cap is a reason too — but not the day after a tidy that
+    # reviewed it: it waits for TIDY_MIN_DAYS like everything else
+    due = ((days >= min_days and volume >= vol_need) or volume >= 3 * vol_need
+           or (openi > max_open and days >= min_days))
     if not due:
         return ''
     why = (f"{len(new)} new entries, {merges} merge{'s' if merges != 1 else ''} and "
@@ -744,6 +772,50 @@ STOP = set('the a an and or of to in on for with by is are be as at from that th
 
 def _toks(text):
     return {w for w in re.findall(r'[a-z0-9_]{3,}', text.lower()) if w not in STOP}
+
+
+def similar(ta, tb):
+    """Near-duplicate test on two token sets: Jaccard catches rewordings, the overlap
+    coefficient a short restatement of a longer entry (only on entries long enough not to match
+    by accident). Measured on real ledgers: no false positives at these settings."""
+    if len(ta) < 3 or len(tb) < 3:
+        return False
+    shared = len(ta & tb)
+    return (shared / len(ta | tb) >= 0.3
+            or (min(len(ta), len(tb)) >= 5 and shared / min(len(ta), len(tb)) >= 0.6))
+
+
+_EXT_INDEX = {}
+
+
+def external_status(root, eid):
+    """The status line another register gives one of its ids: the first line mentioning
+    `status` in the Markdown section headed by that id, or ''. All tracked .md files are indexed
+    once per run (no grep dialect differences)."""
+    prefixes = ''.join(sorted(external_prefixes(root)))
+    key = (root, prefixes)
+    if key not in _EXT_INDEX:
+        idx = {}
+        head = re.compile(r'^#+ .*?\b([' + (prefixes or 'Z') + r']-\d{3,6})\b')
+        for path in _git(root, 'ls-files', '*.md').splitlines():
+            try:
+                lines = io.open(os.path.join(root, path), encoding='utf-8').read().splitlines()
+            except (OSError, UnicodeDecodeError):
+                continue
+            cur = None
+            for l in lines:
+                m = head.match(l)
+                if m:
+                    cur = m.group(1) if m.group(1) not in idx else None
+                    if cur:
+                        idx[cur] = ''
+                    continue
+                if l.startswith('#'):
+                    cur = None
+                elif cur and not idx[cur] and re.search(r'(?i)\bstatus\b', l):
+                    idx[cur] = re.sub(r'[*_`]', '', l).strip(' -')[:140]
+        _EXT_INDEX[key] = idx
+    return _EXT_INDEX[key].get(eid, '')
 
 
 def tidy_report(ledger, root, max_open=22):
@@ -814,18 +886,32 @@ def tidy_report(ledger, root, max_open=22):
             if len(ta) < 3:
                 continue
             for b, tb in group[i + 1:]:
-                if len(tb) < 3:
-                    continue
-                # Jaccard catches rewordings; the overlap coefficient catches a short restatement
-                # of a longer entry, but only on entries long enough not to match by accident.
-                # Measured on real ledgers: no false positives at these settings.
-                shared = len(ta & tb)
-                if shared / len(ta | tb) >= 0.3 or (min(len(ta), len(tb)) >= 5
-                                                    and shared / min(len(ta), len(tb)) >= 0.6):
+                if similar(ta, tb):
                     dups.append(f"- {a['id']} ≈ {b['id']} · {entry_text(a)[:60]} | {entry_text(b)[:60]}"
                                 f" → same thing (Supersedes: <older> by <newer>), a refinement, or a"
                                 f" contradiction to settle")
     section('Similar entries — duplicate, refinement or contradiction?', dups)
+
+    # 3b. open items that mirror another register's item: show its status there
+    ext = external_prefixes(root)
+    mirrors = []
+    shut = re.compile(r'(?i)^status\.?\s*:?\s*(closed|resolved|fixed|done|withdrawn)\b')
+    for e in openi:
+        cited = list(dict.fromkeys(i for i in ID_RE.findall(entry_text(e)) if i.split('-')[0] in ext))
+        states = [(c, external_status(root, c)) for c in cited]
+        states = [(c, 'closed' if shut.search(st) else 'open') for c, st in states if st]
+        if not states:
+            continue
+        closed = [c for c, st in states if st == 'closed']
+        summary = ', '.join(f'{c} {st}' for c, st in states)
+        if len(closed) == len(states):
+            act = 'CLOSE here too'
+        elif closed:
+            act = f'keep ({len(closed)} of {len(states)} closed there — reword to what is still open?)'
+        else:
+            act = 'still open there — keep'
+        mirrors.append(line(e, summary, act, width=60))
+    section('Mirrors of another register — its status beside the ledger\'s', mirrors, cap=30)
 
     # 4. entries with no content of their own
     junk = [line(e, 'no content of its own', 'Supersedes: <it> by <the real entry>, or reword by hand')

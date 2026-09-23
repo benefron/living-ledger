@@ -58,8 +58,11 @@ earlier than committed — the entry says `(recorded <commit date>)`). Lore trai
 Ids are **content hashes** (`D-3fa9c1e`): the same on every clone and branch, so parallel
 branches, worktrees, machines and cloud sessions never collide. Legacy sequential ids (`F-014`)
 keep working everywhere. The `commit-msg` gate rejects a commit with no ledger trailer, a ledger
-line outside the last paragraph (it would be silently lost), an id that names no entry, or an id
-where words belong (`Finding: F-1 …` — use `Refs:`).
+line outside the last paragraph (it would be silently lost), an id that names no entry, an id
+where words belong (`Finding: F-1 …` — use `Refs:`), or a new entry that reads like a live one
+without saying how they relate (`Refs:` / `Supersedes:` it — the planned-then-enacted duplicate).
+Ids of another register the repo keeps (`EXTERNAL_IDS`, e.g. `C-012` in a `CONCERNS.md`) may be
+cited freely.
 
 ## What to do when this skill fires
 

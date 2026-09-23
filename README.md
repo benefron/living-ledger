@@ -108,6 +108,12 @@ A decision with no file change is an empty commit:
 git commit --allow-empty --only -m "decide: interview loop" -m "Decision: two rounds, no take-home"
 ```
 
+The gate also stops the commonest source of duplicates — a decision recorded when it is planned
+and again, reworded, when it is enacted: a new entry that reads like a live one is rejected until
+the commit says how they relate (`Refs:` if it enacts it, `Supersedes:` if it replaces it, or a
+`Refs:` beside the new entry if it is genuinely different). Content-hash ids already merge exact
+repeats; this catches the rewordings.
+
 Claude does all of this for you: the skill fires when a decision, finding or dead end comes up in
 conversation, proposes the one-line record, and commits it when you approve.
 
@@ -118,7 +124,8 @@ conversation, proposes the one-line record, and commits it when you approve.
              rejects: no trailer,          derives entries from           auto-committed as
              a trailer outside the         git log since SYNC_FROM;       "chore: ledger sync"
              last paragraph, an            content-hash ids               (only the ledger files)
-             unknown id
+             unknown id, an entry that
+             restates a live one
 
  session start ──► digest.sh ──► bounded digest (overdue, open by area, pinned, recent, retired)
                                   + housekeeping: stale rules, lint, hooks activated, upgrade due
