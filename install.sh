@@ -380,17 +380,20 @@ if auto:
     # derive what the history holds first, so the upgrade is ONE commit that leaves nothing
     CLAUDE_PROJECT_DIR="$repo" "$repo/.claude/hooks/ledger-sync.sh" >/dev/null 2>&1 || true
     if [ -n "$(git -C "$repo" status --porcelain 2>/dev/null)" ]; then
-      local pth
+      # commit ONLY what the upgrade touched — never work the user already had staged
+      local pth; local -a paths=()
       for pth in .claude .githooks .gitattributes .gitignore "$ledger_rel" "$dec_rel"; do
         [ -n "$pth" ] || continue
         if [ -e "$repo/$pth" ] || git -C "$repo" ls-files --error-unmatch -- "$pth" >/dev/null 2>&1; then
           git -C "$repo" add -A -- "$pth" 2>/dev/null || true
+          paths+=("$pth")
         fi
       done
       LEDGER_SYNC_IN_PROGRESS=1 git -C "$repo" commit --no-verify -q \
         -m "chore: upgrade living ledger to template v$LL_TEMPLATE_VERSION" \
         -m "v$wv -> v$LL_TEMPLATE_VERSION: $(ll_version_changes "$LL_TEMPLATE_VERSION")." \
         -m "Ledger: none — living-ledger template upgrade, tooling only" \
+        -- "${paths[@]}" \
         && say "· upgraded    -> committed (v$wv -> v$LL_TEMPLATE_VERSION)"
     else
       say "· upgraded    -> already at v$LL_TEMPLATE_VERSION, nothing to commit"

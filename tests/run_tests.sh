@@ -330,8 +330,11 @@ git -C "$U1" add -A; commit "$U1" "docs: v1 ledger"
 commit "$U1" "feat: pending
 
 Decision: made after the v1 marker, not yet synced"
+echo "user work" > "$U1/staged.txt"; git -C "$U1" add staged.txt
 "$INSTALL" "$U1" --upgrade --quiet
 check "upgrade is ONE commit, with Ledger: none" "git -C '$U1' log -1 --format=%B | grep -q '^Ledger: none'"
+check "…and leaves the user's staged work out of it" "! git -C '$U1' show --name-only --format= HEAD | grep -q staged.txt && git -C '$U1' diff --cached --name-only | grep -qx staged.txt"
+git -C "$U1" reset -q; rm -f "$U1/staged.txt"
 check "floor = the v1 marker"                  "grep -q \"^SYNC_FROM=\" '$U1/.claude/ledger.conf'"
 check "REPO_ID kept"                           "grep -qx 'REPO_ID=v1repo' '$U1/.claude/ledger.conf'"
 sync_ "$U1"
