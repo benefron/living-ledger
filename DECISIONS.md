@@ -215,4 +215,8 @@ Do not hand-edit between the markers.
 | 2026-09-23 | D-30f0af3 | the session digest reports ledger records not shared or not seen (unpushed, not pulled, other branches and worktrees, other machines), from local refs only, never the network | `566a218` |
 | 2026-09-23 | D-dd97495 | each machine writes its own status file into the private index, so machine names never enter a repository and two machines never conflict on it | `566a218` |
 | 2026-09-23 | D-245a95d | branch and machine state is a precondition on a tidy (merge or pull first), not a trigger for one | `566a218` |
+| 2026-09-23 | D-c7d8c48 | the README leads with the workflow the user sees (Claude proposes one-line records and writes them into its commits; the user approves) and keeps the vocabulary and internals as reference | `aaa8b3c` |
+| 2026-09-23 | D-0300a8f | each commit's Directive/Constraint/Rejected trailers become Claude Code path rules in a gitignored .claude/rules/ledger/, regenerated at session start and after each commit | `aaa8b3c` |
+| 2026-09-23 | D-b33dc3f | .claude/hooks/ledger is the query side for any agent or person: context, directives, constraints, rejected, open, decisions, retired, stale, validate | `aaa8b3c` |
+| 2026-09-23 | D-be290b3 | the commit gate refuses a Decision that re-adopts a rejected alternative or a retired framing unless the commit supersedes it | `aaa8b3c` |
 <!-- DECISIONS_LOG_END -->

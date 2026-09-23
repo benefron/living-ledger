@@ -127,6 +127,28 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-c7d8c48 · CLOSED · decision · - · 2026-09-23
+the README leads with the workflow the user sees (Claude proposes one-line records and writes them into its commits; the user approves) and keeps the vocabulary and internals as reference
+→ commit aaa8b3c
+
+## D-0300a8f · CLOSED · decision · - · 2026-09-23
+each commit's Directive/Constraint/Rejected trailers become Claude Code path rules in a gitignored .claude/rules/ledger/, regenerated at session start and after each commit
+→ commit aaa8b3c
+
+## F-0ec7cdf · STANDING · finding · - · 2026-09-23
+Claude Code loads path-scoped rules from a gitignored .claude/rules/ subdirectory when it reads a matching file (checked with a headless run)
+→ commit aaa8b3c
+
+## D-b33dc3f · CLOSED · decision · - · 2026-09-23
+.claude/hooks/ledger is the query side for any agent or person: context, directives, constraints, rejected, open, decisions, retired, stale, validate
+→ commit aaa8b3c
+
+## D-be290b3 · CLOSED · decision · - · 2026-09-23
+the commit gate refuses a Decision that re-adopts a rejected alternative or a retired framing unless the commit supersedes it
+· Rejected: an interactive commit builder like the paper's lore commit | Claude writes the message, and /ledger-note covers records without code
+· Rejected: requiring the subject line to state intent, as Lore does | it clashes with Conventional Commits, which most repos already follow
+→ commit aaa8b3c
+
 ## F-4e76afb · CLOSED · finding · bin · 2026-09-23
 /ledger-status left v1-v2 repos out of the 'Behind template' list and padded it with blank lines
 → commit 18747db
