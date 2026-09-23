@@ -1215,7 +1215,8 @@ def context(root, ledger, path, only=None):
     for c in lore_commits(root, path, limit=500):
         ents = byc.get(c['sha'][:7], [])
         dead = ents and all(is_dead(e) for e in ents)
-        tag = f"{c['sha']} {c['date']}" + (f" · {', '.join(e['id'] for e in ents)}" if ents else '')
+        ids = ', '.join(e['id'] for e in ents) if len(ents) <= 3 else f"{len(ents)} entries"
+        tag = f"{c['sha']} {c['date']}" + (f" · {ids}" if ents else '')
         if dead:
             tag += ' · its entry is superseded/closed — may no longer hold'
         for k, v in c['trailers']:
@@ -1292,7 +1293,8 @@ def write_rules(root, ledger, outdir):
             globs = files
         name = f"{c['date']}-{c['sha'][:7]}.md"
         keep.add(name)
-        ids = f" · {', '.join(e['id'] for e in ents)}" if ents else ''
+        ids = (f" · {', '.join(e['id'] for e in ents)}" if len(ents) <= 3
+               else f" · {len(ents)} ledger entries") if ents else ''
         body = ['---', 'paths:'] + [f'  - "{g.replace(chr(34), "")}"' for g in globs] + ['---', RULES_MARK,
                 f"# From the ledger — {c['sha']} ({c['date']}){ids}", f"_{c['subject']}_", '']
         body += [f"- **{k}:** {v}" for k, v in lines]
