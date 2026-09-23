@@ -1,12 +1,13 @@
-# Records demo/demo.gif:  brew install vhs && vhs demo/demo.tape
-Output demo/demo.gif
+# Frames for demo/demo.gif — run demo/record.sh, which renders them with vhs and assembles the GIF.
+Output demo/frames/
 Set FontSize 15
 Set Width 1200
 Set Height 760
+Set Framerate 25
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 40ms
 Hide
 Type "clear" Enter
 Show
 Type "bash demo/demo.sh" Enter
-Sleep 22s
+Sleep 20s

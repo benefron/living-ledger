@@ -58,6 +58,8 @@ them to install.
 
 ## What it looks like
 
+![A commit without a record is stopped; with one, the ledger updates itself; the next session starts with the digest](demo/demo.gif)
+
 Under the hood, a commit Claude makes carries its records as git trailers in the last paragraph:
 
 ```text

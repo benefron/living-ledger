@@ -560,21 +560,16 @@ def _ledger_path(root):
     return ''
 
 
-GATE_HELP = """  Add trailers in the LAST paragraph of the message (a blank line, then one per line;
-  a long one may wrap onto the next line):
+GATE_HELP = """  Add one line at the end of the message, after a blank line — for example:
 
-    Decision:   use a single-writer queue instead of a lock
-    Finding:    the vendor API caps requests at 10/s          (a settled fact)
-    Opens:      the cache is never invalidated after a deploy  (a problem to resolve)
-    Fixed:      empty stanzas were silently dropped            (found and fixed here)
-    Action:     ask the vendor for a higher rate limit         (+ Due: 2026-10-01)
-    Retires:    "a nightly batch job is good enough"
-    Closes:     F-3fa9c1e        Supersedes: D-8b1e0d2        Refs: F-3fa9c1e, D-014
-    Ledger:     none — pure whitespace reformat, no behaviour change
+    Decision: use a single-writer queue instead of a lock
+    Finding:  the vendor API caps requests at 10/s          (a settled fact)
+    Opens:    the cache is never invalidated after a deploy  (a problem to resolve)
+    Ledger:   none — pure whitespace reformat, no behaviour change
 
-  A decision with no file change:  git commit --allow-empty --only -m "decide: …" -m "Decision: …"
-  Exempt: merges, reverts, fixup!/squash!, [bot] authors, LEDGER_SKIP=1, and EXEMPT_SUBJECTS /
-  EXEMPT_AUTHORS (regexes) in .claude/ledger.conf.  Escape hatch:  git commit --no-verify
+  (Claude normally writes these for you. More kinds — Fixed:, Action:, Retires:, Closes:,
+  Supersedes:, Refs: — are listed at the top of the ledger. A decision with no file change:
+  git commit --allow-empty --only -m "…" -m "Decision: …".  Escape hatch: --no-verify)
 """
 ID_LED = re.compile(r'^[A-Z]{1,3}-[0-9A-Za-z]+\b')
 

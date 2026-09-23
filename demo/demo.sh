@@ -3,7 +3,8 @@
 #   bash demo/demo.sh          — or record it:  vhs demo/demo.tape  (brew install vhs)
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-D="$(mktemp -d)"; export LL_HOME_DIR="$D/claude" LL_SKILL_DIR="$HERE" LL_NO_GLOBAL_HOOK=1
+D="$(cd "$(mktemp -d)" && pwd -P)"; export HOME="$D"   # paths show as ~/app, not a temp path
+export LL_HOME_DIR="$D/claude" LL_SKILL_DIR="$HERE" LL_NO_GLOBAL_HOOK=1
 export GIT_CONFIG_GLOBAL="$D/gitconfig"; git config --global user.name demo
 git config --global user.email demo@example.com; git config --global init.defaultBranch main
 step() { printf '\n\033[1;36m$ %s\033[0m\n' "$*"; sleep 1; }
