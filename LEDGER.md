@@ -127,6 +127,18 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-3d57516 · CLOSED · decision · - · 2026-09-23
+the commit gate rejects a new entry that reads like a live one unless the commit Refs: or Supersedes: it; a Tidy: commit is exempt
+→ commit 95305b5
+
+## D-0e09e0e · CLOSED · decision · - · 2026-09-23
+an open item mirroring another register's item is proposed for closing only when every item it cites is closed there
+→ commit 95305b5
+
+## F-b801e74 · CLOSED · finding · - · 2026-09-23
+an open list over the digest cap re-triggered "tidy due" immediately after a tidy that had just reviewed it
+→ commit 95305b5
+
 ## F-4e56fa1 · CLOSED · finding · - · 2026-09-23
 the stale-rule check flagged rules that cite a closed finding on purpose, as a settled do-not-re-raise warning
 → commit 2faf913

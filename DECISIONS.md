@@ -210,4 +210,6 @@ Do not hand-edit between the markers.
 | 2026-09-23 | D-4ceef34 | Supersedes: <old> by <new> folds a duplicate into the entry that survives it | `a022895` |
 | 2026-09-23 | D-ff761da | post-merge only reports what a merge brought in; the next commit records it, because git still holds the merge state while post-merge runs | `4bca30c` |
 | 2026-09-23 | D-0c2f6ea | EXTERNAL_IDS names id prefixes of another register; the gate accepts them without a ledger entry and the sync keeps them as a pointer on the entry | `4bca30c` |
+| 2026-09-23 | D-3d57516 | the commit gate rejects a new entry that reads like a live one unless the commit Refs: or Supersedes: it; a Tidy: commit is exempt | `95305b5` |
+| 2026-09-23 | D-0e09e0e | an open item mirroring another register's item is proposed for closing only when every item it cites is closed there | `95305b5` |
 <!-- DECISIONS_LOG_END -->
