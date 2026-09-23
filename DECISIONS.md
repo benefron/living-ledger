@@ -219,4 +219,5 @@ Do not hand-edit between the markers.
 | 2026-09-23 | D-0300a8f | each commit's Directive/Constraint/Rejected trailers become Claude Code path rules in a gitignored .claude/rules/ledger/, regenerated at session start and after each commit | `aaa8b3c` |
 | 2026-09-23 | D-b33dc3f | .claude/hooks/ledger is the query side for any agent or person: context, directives, constraints, rejected, open, decisions, retired, stale, validate | `aaa8b3c` |
 | 2026-09-23 | D-be290b3 | the commit gate refuses a Decision that re-adopts a rejected alternative or a retired framing unless the commit supersedes it | `aaa8b3c` |
+| 2026-09-23 | D-a188554 | the commit gate's rejection message shows three examples and the opt-out and says Claude normally writes them; the full vocabulary lives at the top of the ledger | `ce6e809` |
 <!-- DECISIONS_LOG_END -->

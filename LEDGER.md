@@ -127,6 +127,14 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-a188554 · CLOSED · decision · - · 2026-09-23
+the commit gate's rejection message shows three examples and the opt-out and says Claude normally writes them; the full vocabulary lives at the top of the ledger
+→ commit ce6e809
+
+## F-651f5ce · STANDING · finding · - · 2026-09-23
+vhs 0.12 silently writes no GIF or MP4 with ffmpeg 9; its frame output works, and ffmpeg assembles the GIF from those frames
+→ commit ce6e809
+
 ## D-c7d8c48 · CLOSED · decision · - · 2026-09-23
 the README leads with the workflow the user sees (Claude proposes one-line records and writes them into its commits; the user approves) and keeps the vocabulary and internals as reference
 → commit aaa8b3c
