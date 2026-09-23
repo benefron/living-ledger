@@ -16,6 +16,18 @@ merges (3 each), commits (1 per 5) — has passed `TIDY_VOLUME` (25) over at lea
 (7), or three times that volume in any span, or the open list outgrew the digest. Offer it once,
 at a natural pause; if the user declines, don't raise it again this session.
 
+## 0. Tidy where the whole picture is
+
+A tidy edits statuses; it should see every entry it is judging. The "Tidy due" line lists what
+to do first when it applies: switch to the default branch, pull records not yet pulled, merge
+branches or worktrees that hold records (`share-state` names them). Say so, and let the user
+choose: do those first, or tidy now knowing those entries arrive later (the merge driver folds
+them in without conflict — but a duplicate or a closed item among them waits for the next tidy).
+
+```bash
+python3 .claude/hooks/_ledger_parse.py share-state "$(git rev-parse --show-toplevel)"
+```
+
 ## 1. Report
 
 ```bash

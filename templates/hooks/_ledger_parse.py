@@ -26,6 +26,11 @@ Copied verbatim into each repo as .claude/hooks/_ledger_parse.py. Entrypoints:
     _ledger_parse.py tidy-report <LEDGER> <repo_root> [<max_open>]
         -> the candidates a /ledger-tidy pass reviews (markdown)
 
+    _ledger_parse.py share-state <repo_root> [--tsv] [<index_home> <this_host> <repo_id>]
+        -> where ledger records exist that this checkout has not shared: unpushed, not pulled
+           (as of the last fetch), on other local branches / worktrees, and — from the private
+           index — unpushed on other machines. Human lines, or one TSV row (--tsv).
+
     _ledger_parse.py check-msg <commit-msg-file> <repo_root>
         -> the commit gate (called by .githooks/commit-msg): exit 1 with the reason on stderr
            if the message does not relate to the ledger. It reads trailers with the SAME
@@ -459,6 +464,7 @@ def cmd_block(argv):
     max_open = int(argv[7]) if len(argv) > 7 else 22
     stale = stale_rules(path, os.path.join(repo_path, '.claude', 'rules'))
     tidy = tidy_status(path, repo_path, max_open) if os.path.isdir(repo_path) else ''
+    repo_abs = repo_path
     repo_path = _tilde(repo_path)
     today = datetime.date.today().isoformat()
     entries = parse_entries(path)  # file order == newest first
@@ -483,12 +489,22 @@ def cmd_block(argv):
     if tidy:
         flags.append("🧹 tidy due")
 
+    if os.path.isdir(repo_abs):
+        st = share_state(repo_abs)
+        if st['unpushed']:
+            flags.append(f"⇡ {st['unpushed']} records unpushed")
+        if st['incoming']:
+            flags.append(f"⇣ {st['incoming']} records not pulled")
+        live = [o for o in st['others'] if not o['stale']]
+        if live:
+            flags.append('unmerged: ' + ', '.join(f"{o['branch']} ({o['records']})" for o in live[:3]))
+    host = os.environ.get('LL_HOST', '')
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     ver = f" · template v{version}" if version else ""
     out = [f"<!-- REPO:{repo_id} START -->",
            f"## {repo_id}  ·  {repo_path}",
            f"_rebuilt {stamp}_",
-           f"HEAD {head or '?'} · "
+           f"HEAD {head or '?'}" + (f" on {host}" if host else "") + " · "
            + (" · ".join(flags) if flags else "up to date")
            + f" · {len(openi)} open · {len(entries)} entries{ver}"]
     if overdue:
@@ -758,6 +774,18 @@ def tidy_status(ledger, root, max_open=22):
            f"since {label}")
     if openi > max_open:
         why += f"; {openi} open items, over the digest cap of {max_open}"
+    st = share_state(root)
+    first = []
+    if st['default'] and st['branch'] != st['default']:
+        first.append(f"switch to {st['default']} (tidy the default branch)")
+    if st['incoming']:
+        first.append(f"pull {st['incoming']} records from {st['upstream']}")
+    live_branches = [o for o in st['others'] if not o['stale']]
+    if live_branches:
+        first.append('merge ' + ', '.join(f"{o['branch']} ({o['records']})" for o in live_branches[:3])
+                     + ' — or tidy knowing those arrive later')
+    if first:
+        why += '. Before tidying: ' + '; '.join(first)
     return why
 
 
@@ -966,6 +994,124 @@ def cmd_tidy_report(argv):
     return tidy_report(argv[0], argv[1], int(argv[2]) if len(argv) > 2 else 22)
 
 
+# --- sharing: ledger records that exist somewhere this checkout cannot see, or has not shown ---
+
+def _records(root, *rev_range, limit=500):
+    """Ledger records (entry trailers, Closes/Supersedes/Refs, Tidy) in the commits of a range."""
+    raw = _git(root, 'log', f'-n{limit}', '--no-merges', '--format=%B%x1e', *rev_range)
+    n = 0
+    for body in raw.split('\x1e'):
+        for l in trailer_lines(body):
+            k = l.split(':', 1)[0]
+            if k in KINDS or k in RELATE_KEYS or k == 'Tidy':
+                n += 1
+    return n
+
+
+def _ago(seconds):
+    m = int(seconds // 60)
+    if m < 90:
+        return f'{m} min'
+    h = m // 60
+    return f'{h} h' if h < 48 else f'{h // 24} days'
+
+
+def share_state(root):
+    """Everything is read from local refs — no network. `behind` is as of the last fetch."""
+    import time
+    st = dict(branch='', upstream='', ahead=0, behind=0, unpushed=0, incoming=0, fetch_age='',
+              default='', others=[], dirty=0)
+    st['branch'] = _git(root, 'rev-parse', '--abbrev-ref', 'HEAD').strip()
+    up = _git(root, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}').strip()
+    if up and '@{u}' not in up:
+        st['upstream'] = up
+        counts = _git(root, 'rev-list', '--left-right', '--count', f'{up}...HEAD').split()
+        if len(counts) == 2:
+            st['behind'], st['ahead'] = int(counts[0]), int(counts[1])
+        if st['ahead']:
+            st['unpushed'] = _records(root, f'{up}..HEAD')
+        if st['behind']:
+            st['incoming'] = _records(root, f'HEAD..{up}')
+        common = _git(root, 'rev-parse', '--git-common-dir').strip()
+        fh = os.path.join(root, common, 'FETCH_HEAD') if not os.path.isabs(common) else os.path.join(common, 'FETCH_HEAD')
+        if os.path.exists(fh):
+            st['fetch_age'] = _ago(time.time() - os.path.getmtime(fh))
+    dflt = _git(root, 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD').strip()
+    st['default'] = dflt.split('/', 1)[1] if '/' in dflt else next(
+        (b for b in ('main', 'master') if _git(root, 'rev-parse', '--verify', '-q', b).strip()), '')
+    trees = {}
+    wt, cur = _git(root, 'worktree', 'list', '--porcelain'), None
+    for l in wt.splitlines():
+        if l.startswith('worktree '):
+            cur = l[9:]
+        elif l.startswith('branch refs/heads/') and cur:
+            trees[l[18:]] = cur
+    for b in _git(root, 'for-each-ref', '--format=%(refname:short)%09%(committerdate:unix)',
+                  'refs/heads').splitlines():
+        name, _, when = b.partition('\t')
+        if not name or name == st['branch']:
+            continue
+        n = _records(root, f'HEAD..{name}')
+        if n:
+            age = time.time() - int(when or 0)
+            st['others'].append(dict(branch=name, records=n, tree=trees.get(name, ''),
+                                     stale=age > 30 * 86400, age=_ago(age)))
+    led = _conf(root, 'LEDGER_PATH')
+    if led and _git(root, 'status', '--porcelain', '--', led).strip():
+        st['dirty'] = 1
+    return st
+
+
+def share_lines(root, index_home='', this_host='', repo_id=''):
+    """Human lines for the digest; empty when everything is shared."""
+    st, out = share_state(root), []
+    if st['unpushed']:
+        out.append(f"{st['branch']} holds {st['unpushed']} ledger record{'s' if st['unpushed'] != 1 else ''} "
+                   f"not pushed to {st['upstream']} ({st['ahead']} commit{'s' if st['ahead'] != 1 else ''}) — "
+                   f"other machines and collaborators cannot see them yet")
+    if st['incoming']:
+        out.append(f"{st['upstream']} has {st['incoming']} ledger record{'s' if st['incoming'] != 1 else ''} "
+                   f"not pulled here (as of the last fetch{', ' + st['fetch_age'] + ' ago' if st['fetch_age'] else ''})")
+    for o in st['others'][:5]:
+        where = f" (worktree {_tilde(o['tree'])})" if o['tree'] else ''
+        stale = f"; last commit {o['age']} ago — abandoned?" if o['stale'] else ''
+        out.append(f"branch {o['branch']}{where} holds {o['records']} ledger record"
+                   f"{'s' if o['records'] != 1 else ''} not in {st['branch']}{stale}")
+    if index_home and repo_id:
+        for path in sorted(__import__('glob').glob(os.path.join(index_home, 'hosts', '*.tsv'))):
+            host = os.path.basename(path)[:-4]
+            if host == this_host:
+                continue
+            try:
+                rows = io.open(path, encoding='utf-8').read().splitlines()
+            except OSError:
+                continue
+            for r in rows:
+                f = r.split('\t')
+                if len(f) >= 10 and f[0] == repo_id and (f[6] not in ('', '0') or f[7]):
+                    bits = []
+                    if f[6] not in ('', '0'):
+                        bits.append(f"{f[6]} ledger records not pushed from {f[2]}")
+                    if f[7]:
+                        bits.append('unmerged branches ' + f[7].replace(',', ', '))
+                    out.append(f"on {host} (as of {f[9]}): " + '; '.join(bits))
+    return out
+
+
+def share_tsv(root):
+    st = share_state(root)
+    others = ','.join(f"{o['branch']}:{o['records']}" for o in st['others'])
+    return '\t'.join(str(x) for x in (st['branch'], st['upstream'] or '-', st['ahead'], st['behind'],
+                                      st['unpushed'], others, st['dirty']))
+
+
+def cmd_share_state(argv):
+    if len(argv) > 1 and argv[1] == '--tsv':
+        return share_tsv(argv[0])
+    extra = argv[1:4] if len(argv) >= 4 else ['', '', '']
+    return '\n'.join(share_lines(argv[0], *extra))
+
+
 def cmd_id(argv):
     return hash_id(argv[0], ' '.join(argv[1:]))
 
@@ -976,7 +1122,8 @@ def main():
     mode, rest = sys.argv[1], sys.argv[2:]
     fn = {'digest': cmd_digest, 'block': cmd_block, 'stale-rules': cmd_stale_rules,
           'lint': cmd_lint, 'id': cmd_id, 'check-msg': cmd_check_msg,
-          'tidy-status': cmd_tidy_status, 'tidy-report': cmd_tidy_report}.get(mode)
+          'tidy-status': cmd_tidy_status, 'tidy-report': cmd_tidy_report,
+          'share-state': cmd_share_state}.get(mode)
     if fn is None:
         sys.exit(2)
     s = fn(rest)

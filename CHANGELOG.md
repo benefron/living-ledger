@@ -84,6 +84,14 @@ not rewritten just to move its timestamp; hash ids are never read as legacy ids 
   `C-001`…). The gate accepts `Refs: C-022` and `Opens: C-032 -- <words>`; the sync keeps them as a
   `· Refs:` pointer. Detected at install from the trailers already in history.
 
+**Branches, worktrees, machines**
+- `share-state`: ledger records this checkout has not shared or seen — unpushed, on the upstream
+  but not pulled (last fetch, no network), on other local branches/worktrees, and unpushed on
+  other machines. Shown in the digest ("Not shared: …"), the dashboard (`⇡`/`⇣`/`unmerged:` and
+  `on <host>`), and as preconditions on "Tidy due".
+- Each machine writes `hosts/<machine>.tsv` into the private index (single writer, no merge
+  conflicts); `/ledger-status` lists every machine's unshared records.
+
 **Upgrade** commits with `Ledger: none` (a template bump is not a project decision) and derives
 pending trailers into the same single commit.
 

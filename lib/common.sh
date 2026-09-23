@@ -210,6 +210,13 @@ ll_interactive() {
   return 0
 }
 
+# ll_host  ->  this machine's name in the PRIVATE cross-repo index (never written into a repo):
+# $LEDGER_HOST, else the short hostname, reduced to [A-Za-z0-9._-].
+ll_host() {
+  local h="${LEDGER_HOST:-$(hostname -s 2>/dev/null || uname -n 2>/dev/null || echo host)}"
+  printf '%s\n' "$h" | tr -c 'A-Za-z0-9._\n-' '-'
+}
+
 # ll_newest_entry_sha <ledger_path>  ->  the commit sha of the newest entry that has a
 # "→ commit <sha>" line (entries are newest-first), or '' if none.
 ll_newest_entry_sha() {

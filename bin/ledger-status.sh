@@ -110,6 +110,23 @@ fi
     printf '%s' "$BEHIND"
     echo
   fi
+  # ledger records not shared yet, per machine (hosts/<host>.tsv, each written by its own machine)
+  NS="$(for t in "$HOME_DIR"/hosts/*.tsv; do
+          [ -e "$t" ] || continue
+          h="$(basename "$t" .tsv)"
+          awk -F'\t' -v h="$h" '($7 != "" && $7 != "0") || $8 != "" || $9 == "1" {
+            s = "- **" h "** · " $1 " (" $3 "): "; sep = ""
+            if ($7 != "" && $7 != "0") { s = s $7 " records not pushed"; sep = " · " }
+            if ($8 != "") { gsub(/,/, ", ", $8); s = s sep "unmerged branches " $8; sep = " · " }
+            if ($9 == "1") { s = s sep "ledger edited, not committed" }
+            print s " — as of " $10 }' "$t"
+        done)"
+  if [ -n "$NS" ]; then
+    echo "## Not shared yet — per machine"
+    echo
+    printf '%s\n' "$NS"
+    echo
+  fi
   for f in "$REPOS"/*.md; do [ -e "$f" ] || continue; cat "$f"; echo; echo; done
 } > "$HOME_DIR/DASHBOARD.md"
 

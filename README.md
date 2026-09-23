@@ -175,6 +175,15 @@ Everything is local shell + python, readable in `templates/`. Nothing phones hom
 | `.claude/hooks/ledger-index-push.sh` | session start (async) / session end | commits + pushes `~/.claude/ledger` **only if you gave it a remote** |
 | `bin/ledger-session.sh` | session start, user-level | reads only; prints a one-line suggestion |
 
+**Branches, worktrees and machines.** At session start the digest also says where ledger records
+exist that this checkout has not shared or seen — unpushed here, on the upstream but not pulled
+(as of the last fetch; the session never touches the network for it), on another local branch or
+worktree, or unpushed on another of your machines. Each machine writes its own one-line-per-repo
+status file into your private index (`hosts/<machine>.tsv`), so `/ledger-status` on any machine
+shows "on rig-mac: 2 records not pushed". Machine names live only in that private index, never
+in a repository. A "Tidy due" line says what to merge or pull first, so a tidy judges the whole
+picture.
+
 Git never runs committed hooks by itself. On a fresh clone, the first Claude Code session
 installs a small **shim** per hook into the clone's `.git/hooks/` (an existing hook, e.g. Git
 LFS's, is kept and still runs first) and says so in the session. Set `AUTO_HOOKS=no` in

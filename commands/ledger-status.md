@@ -22,6 +22,12 @@ Trailing names filter to those repo ids.
 
 - overdue items first (`⏰`), then the open items;
 - the most recent decisions;
+- **Not shared yet — per machine** (top of the dashboard): records unpushed on a machine,
+  branches or worktrees holding records not merged, a ledger edited but not committed — each
+  machine's own report, with the time it was made. Say which machine to go to, and what to push
+  or merge there;
+- the header line names the machine that last rebuilt the block (`on <host>`), with `⇡ N records
+  unpushed`, `⇣ N records not pulled` and `unmerged: <branch> (N)` for that machine;
 - the flags on the header line: `N commits since last entry` (capture is lapsing — bots, the
   ledger's own sync commits and `EXEMPT_SUBJECTS` are not counted), `⚠ triage` (more open items
   than the session digest can show), `🧹 tidy due` (enough work and time since the last tidy —

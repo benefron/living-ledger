@@ -538,6 +538,32 @@ check "report: a mirror whose concern is closed there → close here" "printf '%
 check "report: a mirror still open there → keep" "printf '%s' \"\$REP\" | grep 'C-102' | grep -q 'still open there'"
 
 # ---------------------------------------------------------------------------
+echo "13f. what this checkout has not shared — and what other machines have not"
+export LEDGER_HOST=testhost            # this machine, as the index names it
+SB="$WORK/share.git"; git init -q --bare "$SB"
+SA="$(newrepo shareA)"; installed "$SA"; git -C "$SA" remote add origin "$SB"; git -C "$SA" push -q -u origin main 2>/dev/null
+hc "$SA" -m "x" -m "Decision: a decision only this machine has"
+SH() { CLAUDE_PROJECT_DIR="$1" python3 "$1/.claude/hooks/_ledger_parse.py" share-state "$1" "$LL_HOME_DIR/ledger" "${2:-testhost}" "$(sed -n 's/^REPO_ID=//p' "$1/.claude/ledger.conf")"; }
+check "unpushed records are reported" "SH '$SA' | grep -q 'main holds 1 ledger record not pushed to origin/main'"
+check "…and the digest says so"       "digest '$SA' | grep -q 'Not shared: main holds 1 ledger record not pushed'"
+git -C "$SA" push -q 2>/dev/null
+check "after the push: nothing"       "[ -z \"\$(SH '$SA')\" ]"
+SB2="$WORK/shareB"; git clone -q "$SB" "$SB2"; "$INSTALL" "$SB2" --quiet >/dev/null 2>&1
+hc "$SB2" -m "y" -m "Decision: made on the other machine"; git -C "$SB2" push -q 2>/dev/null; git -C "$SA" fetch -q
+check "records on origin not pulled here (as of the last fetch)" "SH '$SA' | grep -q 'origin/main has 1 ledger record not pulled here (as of the last fetch'"
+git -C "$SA" pull -q --no-rebase 2>/dev/null
+git -C "$SA" checkout -q -b feature; hc "$SA" -m "z" -m "Decision: work on a side branch"; git -C "$SA" checkout -q main
+git -C "$SA" worktree add -q "$WORK/shareA-wt" feature 2>/dev/null
+check "a branch with its worktree is named"  "SH '$SA' | grep -q \"branch feature (worktree .*shareA-wt) holds 1 ledger record not in main\""
+LEDGER_HOST=rigmac CLAUDE_PROJECT_DIR="$SA" "$SA/.claude/hooks/ledger-rollup.sh"
+check "the rollup writes this machine's hosts file" "grep -q 'feature:1' '$LL_HOME_DIR/ledger/hosts/rigmac.tsv'"
+check "the block says which machine rolled it up"  "grep -q ' on rigmac · ' \"$LL_HOME_DIR/ledger/repos/\$(sed -n 's/^REPO_ID=//p' '$SA/.claude/ledger.conf').md\""
+check "another machine's session sees rigmac's unmerged work" "SH '$SA' laptop | grep -q 'on rigmac (as of .*unmerged branches feature:1'"
+check "…its own host file is not echoed back"                 "! SH '$SA' rigmac | grep -q 'on rigmac'"
+check "the dashboard lists it per machine" "'$SKILL/bin/ledger-status.sh' --no-git 2>/dev/null > '$WORK/dash.out'; sed -n '/Not shared yet/,/^## [^N]/p' '$WORK/dash.out' | grep -q 'rigmac'"
+unset LEDGER_HOST
+
+# ---------------------------------------------------------------------------
 echo "14. the user-level session hook"
 SESS="$SKILL/bin/ledger-session.sh"
 NL="$(newrepo noledger)"

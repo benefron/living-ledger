@@ -38,7 +38,8 @@ MAX_OPEN="${LL_MAX_OPEN:-22}"
 VIEW="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/ll-roll-$$")"
 cp "$LEDGER" "$VIEW" && LL_LEDGER_FILE="$VIEW" LL_DECISIONS_FILE="" \
   "$HERE/ledger-sync.sh" >/dev/null 2>&1 || true
-PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/_ledger_parse.py" block \
+HOST="$(ll_host)"
+LL_HOST="$HOST" PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/_ledger_parse.py" block \
   "$VIEW" "$ID" "$REPO" "$HEAD_SHA" "$STATE" "$SINCE" "$VERSION" "$MAX_OPEN" \
   > "$HOME_DIR/repos/$ID.md.tmp" 2>/dev/null || true
 # rewrite the block only if something other than its _rebuilt stamp changed — otherwise every
@@ -52,6 +53,25 @@ if [ -s "$BLK.tmp" ]; then
   fi
 fi
 rm -f "$VIEW"
+
+# this machine's row in hosts/<host>.tsv: what this checkout has not shared. One file per
+# machine and only that machine writes it, so two machines never conflict on it; any machine's
+# /ledger-status (and the session digest) can then say "on rig-mac: 2 records not pushed".
+HOSTS="$HOME_DIR/hosts"; mkdir -p "$HOSTS" 2>/dev/null
+SHARE="$(PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/_ledger_parse.py" share-state "$REPO" --tsv 2>/dev/null || true)"
+if [ -n "$SHARE" ]; then
+  SHORT="$(printf '%s' "$REPO" | awk -v h="$HOME" 'index($0, h) == 1 { $0 = "~" substr($0, length(h) + 1) } { print }')"
+  ROW="$(printf '%s\t%s\t%s\t%s' "$ID" "$SHORT" "$SHARE" "$(date -u '+%Y-%m-%dT%H:%MZ')")"
+  # columns: repo_id path branch upstream ahead behind unpushed_records unmerged dirty stamp
+  ROW="$(printf '%s' "$ROW" | awk -F'\t' 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6,$7,$8,$9,$10}')"
+  { grep -v "^$ID	" "$HOSTS/$HOST.tsv" 2>/dev/null || true; printf '%s\n' "$ROW"; } | sort > "$HOSTS/$HOST.tsv.tmp"
+  if cmp -s "$HOSTS/$HOST.tsv.tmp" "$HOSTS/$HOST.tsv" 2>/dev/null \
+     || [ "$(cut -f1-9 "$HOSTS/$HOST.tsv.tmp")" = "$(cut -f1-9 "$HOSTS/$HOST.tsv" 2>/dev/null)" ]; then
+    rm -f "$HOSTS/$HOST.tsv.tmp"          # only the stamp would move: no index churn
+  else
+    mv "$HOSTS/$HOST.tsv.tmp" "$HOSTS/$HOST.tsv"
+  fi
+fi
 
 # registry row: repo_id \t remote_url \t ledger_relpath \t first_seen_date
 REG="$HOME_DIR/registry.tsv"

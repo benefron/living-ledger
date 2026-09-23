@@ -131,6 +131,20 @@ fi
 # --- stale path-scoped rules ------------------------------------------------
 # A rule in .claude/rules/ exists to stop ONE open finding being re-derived. When that
 # finding is CLOSED or SUPERSEDED the rule is now misinforming future sessions.
+# --- ledger records that exist somewhere this checkout has not shared or seen -----
+# local refs only (no network): unpushed, not pulled as of the last fetch, other branches and
+# worktrees, and — from the private index — other machines' unpushed records for this repo
+SHARE="$(PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/_ledger_parse.py" share-state "$REPO" \
+  "$(ll_ledger_home)" "$(ll_host)" "$(ll_repo_id "$REPO")" 2>/dev/null || true)"
+if [ -n "$SHARE" ]; then
+  while IFS= read -r line; do
+    [ -n "$line" ] && NOTES="$NOTES
+- Not shared: $line."
+  done <<EOF
+$SHARE
+EOF
+fi
+
 # --- is a tidy due? (volume of work + time since the last `Tidy:` commit) --------
 TIDY="$(PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/_ledger_parse.py" tidy-status "$VIEW" "$REPO" "$MAX_OPEN" 2>/dev/null || true)"
 [ -n "$TIDY" ] && NOTES="$NOTES

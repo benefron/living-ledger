@@ -122,6 +122,12 @@ unless the user declines.
   delete it (it is telling every session something untrue).
 - *ledger lint* — a malformed or duplicate entry header; fix it by hand.
 - *over the digest cap* — too many open items to show; that makes a tidy due.
+- *Not shared* — ledger records that exist where this session cannot see them or others cannot
+  see them: unpushed on this branch, on the upstream but not pulled (as of the last fetch), on
+  another local branch or worktree, or unpushed on another machine (from the private index). Say
+  it in one line when it matters to the task — decisions a collaborator or another machine
+  cannot see, or work to merge before relying on the ledger. **Never push, pull or merge on
+  your own**: offer it; those are the user's calls.
 - *Tidy due* — the volume of work since the last tidy (new entries, merges, commits) has passed
   the threshold over enough days. Offer `/ledger-tidy` **once**, at a natural pause — the start
   of a session or the end of a chunk, never mid-task — with the reason from the digest in one
