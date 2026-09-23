@@ -9,17 +9,22 @@
 
 # --- repo / path resolution --------------------------------------------------
 
-# Resolve the repo root. Prefers $CLAUDE_PROJECT_DIR, then git *anchored to this lib
-# file's own directory* (.claude/hooks/ — NOT the caller's cwd), then two dirs up.
+# Resolve the repo root: the checkout this lib file lives in (.claude/hooks/ — NOT the
+# caller's cwd, and NOT $CLAUDE_PROJECT_DIR, which in a git worktree still names the main
+# checkout). git exports GIT_DIR/GIT_INDEX_FILE to hooks it runs in a worktree, and with GIT_DIR
+# set `rev-parse --show-toplevel` answers the *cwd* — .claude/hooks itself — so it is asked
+# without them. (Both mistakes made every worktree commit a silent no-op for the ledger.)
+# $CLAUDE_PROJECT_DIR, then two dirs up, are fallbacks.
 ll_repo_root() {
+  local libdir top
+  libdir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  top="$(cd "$libdir" && env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+         git rev-parse --show-toplevel 2>/dev/null)" && [ -n "$top" ] \
+    && { printf '%s\n' "$top"; return 0; }
   if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -e "${CLAUDE_PROJECT_DIR}/.git" ]; then
     printf '%s\n' "$CLAUDE_PROJECT_DIR"
     return 0
   fi
-  local libdir top
-  libdir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-  top="$(git -C "$libdir" rev-parse --show-toplevel 2>/dev/null)" \
-    && { printf '%s\n' "$top"; return 0; }
   ( cd "$libdir/../.." && pwd )
 }
 
@@ -140,7 +145,7 @@ ll_ensure_index_drivers() {
 # --git-path hooks`, shared by worktrees). A hook already there — Git LFS, pre-commit, a
 # user's own — is kept as <name>.pre-ledger and runs first. core.hooksPath is NOT used: it
 # would silently disable every hook in .git/hooks (Git LFS among them).
-LL_GIT_HOOKS="commit-msg post-commit"
+LL_GIT_HOOKS="commit-msg post-commit post-merge"
 
 ll_hooks_dir() {
   local d; d="$(git -C "$1" rev-parse --git-path hooks 2>/dev/null)" || return 1
@@ -169,7 +174,7 @@ ll_activate_git_hooks() {
   hp="$(git -C "$root" config --get core.hooksPath 2>/dev/null || true)"
   if [ "$hp" = ".githooks" ]; then
     # a v3 install: move to shims unless .githooks also holds the repo's own hooks
-    extra="$(ls -1 "$root/.githooks" 2>/dev/null | grep -vxE 'commit-msg|post-commit' || true)"
+    extra="$(ls -1 "$root/.githooks" 2>/dev/null | grep -vxE 'commit-msg|post-commit|post-merge' || true)"
     [ -n "$extra" ] && return 0
     git -C "$root" config --unset core.hooksPath 2>/dev/null
     printf 'core.hooksPath unset (it disabled the hooks in .git/hooks); '
@@ -203,6 +208,13 @@ ll_interactive() {
   case "${LEDGER_DIGEST:-}" in on|1|yes) return 0 ;; off|0|no) return 1 ;; esac
   case "${CLAUDE_CODE_ENTRYPOINT:-}" in sdk-*|*-headless) return 1 ;; esac
   return 0
+}
+
+# ll_host  ->  this machine's name in the PRIVATE cross-repo index (never written into a repo):
+# $LEDGER_HOST, else the short hostname, reduced to [A-Za-z0-9._-].
+ll_host() {
+  local h="${LEDGER_HOST:-$(hostname -s 2>/dev/null || uname -n 2>/dev/null || echo host)}"
+  printf '%s\n' "$h" | tr -c 'A-Za-z0-9._\n-' '-'
 }
 
 # ll_newest_entry_sha <ledger_path>  ->  the commit sha of the newest entry that has a

@@ -26,6 +26,16 @@ Copied verbatim into each repo as .claude/hooks/_ledger_parse.py. Entrypoints:
     _ledger_parse.py tidy-report <LEDGER> <repo_root> [<max_open>]
         -> the candidates a /ledger-tidy pass reviews (markdown)
 
+    _ledger_parse.py share-state <repo_root> [--tsv] [<index_home> <this_host> <repo_id>]
+        -> where ledger records exist that this checkout has not shared: unpushed, not pulled
+           (as of the last fetch), on other local branches / worktrees, and — from the private
+           index — unpushed on other machines. Human lines, or one TSV row (--tsv).
+
+    _ledger_parse.py cli <repo_root> <command> [args]     (what `.claude/hooks/ledger` runs)
+        -> the query side of the Lore protocol over this repo, for any agent or person:
+           context|directives|constraints|rejected <path>, open, decisions, retired,
+           stale, validate, rules, tidy, share. `ledger help` lists them.
+
     _ledger_parse.py check-msg <commit-msg-file> <repo_root>
         -> the commit gate (called by .githooks/commit-msg): exit 1 with the reason on stderr
            if the message does not relate to the ledger. It reads trailers with the SAME
@@ -274,6 +284,10 @@ def _one(e, width=200, dated=False):
         tags.append(f"due {entry_due(e)}")
     if entry_meta(e, 'Owner'):
         tags.append(f"owner {entry_meta(e, 'Owner')}")
+    if entry_meta(e, 'Confidence').lower().startswith('low'):
+        tags.append('low confidence')
+    if entry_meta(e, 'Reversibility').lower().startswith('irreversible'):
+        tags.append('irreversible')
     if dated:
         tags.append(e['date'])
     tag = f" ({', '.join(tags)})" if tags else ''
@@ -333,7 +347,7 @@ def cmd_digest(argv):
     recent = _by_area(recent[:max_recent * 2], areas)[:max_recent]
 
     out = ["# Project ledger digest (auto-injected; full file: %s)" % disp, ""]
-    out.append(f"{len(entries)} entries · {len(openi)} open"
+    out.append(f"{len(entries)} entr{'y' if len(entries) == 1 else 'ies'} · {len(openi)} open"
                + (f" ({len(overdue)} overdue)" if overdue else "")
                + f" · {len(pinned)} pinned · {len(retire)} retired framings")
     out.append("")
@@ -397,11 +411,16 @@ def stale_rules(ledger_path, rules_dir):
         except OSError:
             continue
         seen = []
-        for eid in ID_RE.findall(text):
-            st = status.get(eid)
-            if st and eid not in seen:
-                seen.append(eid)
-                out.append('stale rule: %s cites %s (%s)' % (name, eid, st))
+        for line in text.splitlines():
+            # a line that itself says the entry is closed ("F-005 · CLOSED — do not re-raise")
+            # cites it on purpose, as a settled warning: that is not stale
+            if re.search(r'(?i)\b(closed|superseded|resolved|retired)\b', line):
+                continue
+            for eid in ID_RE.findall(line):
+                st = status.get(eid)
+                if st and eid not in seen:
+                    seen.append(eid)
+                    out.append('stale rule: %s cites %s (%s)' % (name, eid, st))
     return out
 
 
@@ -454,6 +473,7 @@ def cmd_block(argv):
     max_open = int(argv[7]) if len(argv) > 7 else 22
     stale = stale_rules(path, os.path.join(repo_path, '.claude', 'rules'))
     tidy = tidy_status(path, repo_path, max_open) if os.path.isdir(repo_path) else ''
+    repo_abs = repo_path
     repo_path = _tilde(repo_path)
     today = datetime.date.today().isoformat()
     entries = parse_entries(path)  # file order == newest first
@@ -478,12 +498,22 @@ def cmd_block(argv):
     if tidy:
         flags.append("🧹 tidy due")
 
+    if os.path.isdir(repo_abs):
+        st = share_state(repo_abs)
+        if st['unpushed']:
+            flags.append(f"⇡ {st['unpushed']} records unpushed")
+        if st['incoming']:
+            flags.append(f"⇣ {st['incoming']} records not pulled")
+        live = [o for o in st['others'] if not o['stale']]
+        if live:
+            flags.append('unmerged: ' + ', '.join(f"{o['branch']} ({o['records']})" for o in live[:3]))
+    host = os.environ.get('LL_HOST', '')
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     ver = f" · template v{version}" if version else ""
     out = [f"<!-- REPO:{repo_id} START -->",
            f"## {repo_id}  ·  {repo_path}",
            f"_rebuilt {stamp}_",
-           f"HEAD {head or '?'} · "
+           f"HEAD {head or '?'}" + (f" on {host}" if host else "") + " · "
            + (" · ".join(flags) if flags else "up to date")
            + f" · {len(openi)} open · {len(entries)} entries{ver}"]
     if overdue:
@@ -512,6 +542,12 @@ def _conf(root, key):
     except OSError:
         pass
     return ''
+
+
+def external_prefixes(root):
+    """Id prefixes that belong to ANOTHER register (EXTERNAL_IDS=C in ledger.conf, e.g. a
+    CONCERNS.md numbered C-001…): trailers may cite them, the ledger never owns them."""
+    return {p for p in re.split(r'[\s,]+', _conf(root, 'EXTERNAL_IDS').strip('"\'')) if p}
 
 
 def _ledger_path(root):
@@ -558,15 +594,20 @@ def check_msg(msgfile, root):
             break                                   # `git commit -v` scissors
         if not line.startswith('#'):
             kept.append(line)
-    body = '\n'.join(kept).strip()
-    if not body:
-        return []                                   # git aborts an empty message itself
-    subject = body.splitlines()[0].strip()
-    if re.match(r'^(Merge |merge: |Revert |Revert: |revert: |fixup! |squash! |amend! )', subject):
-        return []
     import subprocess
     author = subprocess.run(['git', 'var', 'GIT_AUTHOR_IDENT'], capture_output=True, text=True,
                             cwd=root).stdout
+    return check_body('\n'.join(kept).strip(), root, author)
+
+
+def check_body(body, root, author, structural_only=False):
+    """The gate's rules on one message. structural_only (for `ledger validate` over past
+    commits): skip the checks that depend on the ledger as it is NOW (unknown ids, duplicates)."""
+    if not body:
+        return []                                   # git aborts an empty message itself
+    subject = body.splitlines()[0].strip()
+    if re.match(r'^(Merge |merge: |Revert |Revert: |revert: |fixup! |squash! |amend! |chore: ledger sync)', subject):
+        return []
     if '[bot]' in author:
         return []
     for key, target in (('EXEMPT_SUBJECTS', subject), ('EXEMPT_AUTHORS', author)):
@@ -585,20 +626,24 @@ def check_msg(msgfile, root):
                         "silently ignored:\n" + '\n'.join(f'      {l}' for l in stray)
                         + "\n    Move them into the last paragraph (no prose after them).")
     tl = trailer_lines(body)
-    ledger = _ledger_path(root)
+    ledger = '' if structural_only else _ledger_path(root)
     try:
         known = {e['id'] for e in parse_entries(ledger)} if ledger else set()
     except Exception:
         known = set()
     declared = {m.group(1) for l in tl for m in [re.match(r'^Opens:\s+(F-\S+)\s+\S', l)] if m}
+    ext = external_prefixes(root)
     related = entries = False
     for line in tl:
         key, _, val = line.partition(':')
         val = val.strip()
         if key in KINDS:
+            lead = ID_LED.match(val)
             if key == 'Opens' and re.match(r'^F-(?:[0-9a-f]{7}|\d{3,6})\s+\S', val):
                 entries = True
-            elif ID_LED.match(val):
+            elif lead and lead.group(0).split('-')[0] in ext and len(val[lead.end():].split()) >= 3:
+                entries = True        # "Opens: C-032 -- <words>": cites the other register, has content
+            elif lead:
                 problems.append(f"`{key}: {val[:50]}` starts with an id. To relate this commit to an "
                                 f"existing entry use `Refs: <id>` (or `Closes:`); `{key}:` records a "
                                 f"new statement in words.")
@@ -611,6 +656,8 @@ def check_msg(msgfile, root):
             if not ids:
                 problems.append(f"`{key}: {val[:40]}` names no entry id (ids look like F-3fa9c1e or F-014).")
             for i in ids:
+                if i.split('-')[0] in ext:
+                    continue              # an id of the other register: not the ledger's to check
                 if ledger and os.path.exists(ledger) and i not in known and i not in declared:
                     problems.append(f"`{key}: {i}` — there is no entry {i} in "
                                     f"{os.path.relpath(ledger, root)}. (On another branch? Merge it "
@@ -625,6 +672,57 @@ def check_msg(msgfile, root):
                                 "words>`.")
         elif key in ('Due', 'Date') and not re.fullmatch(r'\d{4}-\d{2}-\d{2}', val):
             problems.append(f"`{key}: {val}` must be a date, YYYY-MM-DD.")
+    # a new entry that reads like a live one is how duplicates are born (the planned decision,
+    # then the same decision again when enacted): the commit must say how they relate
+    if entries and ledger and os.path.exists(ledger) and not any(
+            l.startswith('Tidy:') for l in tl):
+        mentioned = set()
+        for line in tl:
+            k, _, v = line.partition(':')
+            if k in RELATE_KEYS:
+                mentioned.update(ID_RE.findall(v))
+        live = [e for e in parse_entries(ledger) if not is_dead(e)]
+        for line in tl:
+            k, _, v = line.partition(':')
+            if k not in KINDS or not v.strip():
+                continue
+            typ = KINDS[k][1]
+            tv = _toks(v)
+            # anti-pattern filtering: a decision that re-adopts a retired framing, or an
+            # alternative a live decision rejected, must say so on purpose
+            if typ == 'decision':
+                hit = None
+                for e in live:
+                    if e['id'] in mentioned:
+                        continue
+                    if e['type'] == 'retired' and similar(tv, _toks(entry_text(e))):
+                        hit = (e, 'retired', entry_text(e))
+                        break
+                    for l in e['lines']:
+                        if l.startswith('· Rejected:'):
+                            alt = l[len('· Rejected:'):].split('|')[0].strip()
+                            if similar(tv, _toks(alt)):
+                                hit = (e, 'rejected', l[2:])
+                                break
+                    if hit:
+                        break
+                if hit:
+                    e, how, what = hit
+                    problems.append(
+                        f"`{k}: {v.strip()[:60]}` re-adopts what {e['id']} "
+                        + ("retired" if how == 'retired' else "rejected")
+                        + f" (\"{what[:80]}\"). If that is deliberate, add `Supersedes: {e['id']}` and say "
+                        f"in the body what changed; otherwise this is the dead end the ledger exists to prevent.")
+                    continue
+            for e in live:
+                if e['type'] == typ and e['id'] not in mentioned and similar(tv, _toks(entry_text(e))):
+                    problems.append(
+                        f"`{k}: {v.strip()[:60]}` reads like {e['id']} (\"{entry_text(e)[:70]}\"). "
+                        f"If this commit enacts or extends it: `Refs: {e['id']}` instead of a new entry. "
+                        f"If it replaces it: keep the entry and add `Supersedes: {e['id']}`. If it is "
+                        f"genuinely different: keep the entry and add `Refs: {e['id']}` to show you checked.")
+                    break
+
     if not problems and not (entries or related):
         problems.append("this commit does not relate to the ledger.")
     return problems
@@ -705,7 +803,10 @@ def tidy_status(ledger, root, max_open=22):
     except ValueError:
         min_days, vol_need = 7, 25
     volume = len(new) + 3 * merges + commits // 5
-    due = (days >= min_days and volume >= vol_need) or volume >= 3 * vol_need or openi > max_open
+    # an open list over the digest cap is a reason too — but not the day after a tidy that
+    # reviewed it: it waits for TIDY_MIN_DAYS like everything else
+    due = ((days >= min_days and volume >= vol_need) or volume >= 3 * vol_need
+           or (openi > max_open and days >= min_days))
     if not due:
         return ''
     why = (f"{len(new)} new entries, {merges} merge{'s' if merges != 1 else ''} and "
@@ -713,6 +814,18 @@ def tidy_status(ledger, root, max_open=22):
            f"since {label}")
     if openi > max_open:
         why += f"; {openi} open items, over the digest cap of {max_open}"
+    st = share_state(root)
+    first = []
+    if st['default'] and st['branch'] != st['default']:
+        first.append(f"switch to {st['default']} (tidy the default branch)")
+    if st['incoming']:
+        first.append(f"pull {st['incoming']} records from {st['upstream']}")
+    live_branches = [o for o in st['others'] if not o['stale']]
+    if live_branches:
+        first.append('merge ' + ', '.join(f"{o['branch']} ({o['records']})" for o in live_branches[:3])
+                     + ' — or tidy knowing those arrive later')
+    if first:
+        why += '. Before tidying: ' + '; '.join(first)
     return why
 
 
@@ -727,6 +840,50 @@ STOP = set('the a an and or of to in on for with by is are be as at from that th
 
 def _toks(text):
     return {w for w in re.findall(r'[a-z0-9_]{3,}', text.lower()) if w not in STOP}
+
+
+def similar(ta, tb):
+    """Near-duplicate test on two token sets: Jaccard catches rewordings, the overlap
+    coefficient a short restatement of a longer entry (only on entries long enough not to match
+    by accident). Measured on real ledgers: no false positives at these settings."""
+    if len(ta) < 3 or len(tb) < 3:
+        return False
+    shared = len(ta & tb)
+    return (shared / len(ta | tb) >= 0.3
+            or (min(len(ta), len(tb)) >= 5 and shared / min(len(ta), len(tb)) >= 0.6))
+
+
+_EXT_INDEX = {}
+
+
+def external_status(root, eid):
+    """The status line another register gives one of its ids: the first line mentioning
+    `status` in the Markdown section headed by that id, or ''. All tracked .md files are indexed
+    once per run (no grep dialect differences)."""
+    prefixes = ''.join(sorted(external_prefixes(root)))
+    key = (root, prefixes)
+    if key not in _EXT_INDEX:
+        idx = {}
+        head = re.compile(r'^#+ .*?\b([' + (prefixes or 'Z') + r']-\d{3,6})\b')
+        for path in _git(root, 'ls-files', '*.md').splitlines():
+            try:
+                lines = io.open(os.path.join(root, path), encoding='utf-8').read().splitlines()
+            except (OSError, UnicodeDecodeError):
+                continue
+            cur = None
+            for l in lines:
+                m = head.match(l)
+                if m:
+                    cur = m.group(1) if m.group(1) not in idx else None
+                    if cur:
+                        idx[cur] = ''
+                    continue
+                if l.startswith('#'):
+                    cur = None
+                elif cur and not idx[cur] and re.search(r'(?i)\bstatus\b', l):
+                    idx[cur] = re.sub(r'[*_`]', '', l).strip(' -')[:140]
+        _EXT_INDEX[key] = idx
+    return _EXT_INDEX[key].get(eid, '')
 
 
 def tidy_report(ledger, root, max_open=22):
@@ -797,18 +954,32 @@ def tidy_report(ledger, root, max_open=22):
             if len(ta) < 3:
                 continue
             for b, tb in group[i + 1:]:
-                if len(tb) < 3:
-                    continue
-                # Jaccard catches rewordings; the overlap coefficient catches a short restatement
-                # of a longer entry, but only on entries long enough not to match by accident.
-                # Measured on real ledgers: no false positives at these settings.
-                shared = len(ta & tb)
-                if shared / len(ta | tb) >= 0.3 or (min(len(ta), len(tb)) >= 5
-                                                    and shared / min(len(ta), len(tb)) >= 0.6):
+                if similar(ta, tb):
                     dups.append(f"- {a['id']} ≈ {b['id']} · {entry_text(a)[:60]} | {entry_text(b)[:60]}"
                                 f" → same thing (Supersedes: <older> by <newer>), a refinement, or a"
                                 f" contradiction to settle")
     section('Similar entries — duplicate, refinement or contradiction?', dups)
+
+    # 3b. open items that mirror another register's item: show its status there
+    ext = external_prefixes(root)
+    mirrors = []
+    shut = re.compile(r'(?i)^status\.?\s*:?\s*(closed|resolved|fixed|done|withdrawn)\b')
+    for e in openi:
+        cited = list(dict.fromkeys(i for i in ID_RE.findall(entry_text(e)) if i.split('-')[0] in ext))
+        states = [(c, external_status(root, c)) for c in cited]
+        states = [(c, 'closed' if shut.search(st) else 'open') for c, st in states if st]
+        if not states:
+            continue
+        closed = [c for c, st in states if st == 'closed']
+        summary = ', '.join(f'{c} {st}' for c, st in states)
+        if len(closed) == len(states):
+            act = 'CLOSE here too'
+        elif closed:
+            act = f'keep ({len(closed)} of {len(states)} closed there — reword to what is still open?)'
+        else:
+            act = 'still open there — keep'
+        mirrors.append(line(e, summary, act, width=60))
+    section('Mirrors of another register — its status beside the ledger\'s', mirrors, cap=30)
 
     # 4. entries with no content of their own
     junk = [line(e, 'no content of its own', 'Supersedes: <it> by <the real entry>, or reword by hand')
@@ -842,6 +1013,14 @@ def tidy_report(ledger, root, max_open=22):
             thin.append(line(e, 'no reasoning in its commit body or DECISIONS.md', 'add a DECISIONS.md section, or accept as self-evident'))
     section('Decisions with no written reasoning', thin, cap=15)
 
+    # 6b. the paper's `lore stale`, and decisions taken on low confidence
+    section('Directives and constraints whose code changed a lot since', stale_directives(root, ledger), cap=15)
+    lowc = [line(e, f'decided on low confidence, {(today - datetime.date.fromisoformat(e["date"])).days} days ago',
+                 're-validate: raise it to a firm decision, or supersede it')
+            for e in live if e['type'] == 'decision' and entry_meta(e, 'Confidence').lower().startswith('low')
+            and (today - datetime.date.fromisoformat(e['date'])).days > 30]
+    section('Low-confidence decisions older than 30 days', lowc)
+
     # 7. rules and headers
     rules = stale_rules(ledger, os.path.join(root, '.claude', 'rules'))
     section('Stale path-scoped rules', [f"- {r}" for r in rules])
@@ -863,6 +1042,350 @@ def cmd_tidy_report(argv):
     return tidy_report(argv[0], argv[1], int(argv[2]) if len(argv) > 2 else 22)
 
 
+# --- sharing: ledger records that exist somewhere this checkout cannot see, or has not shown ---
+
+def _records(root, *rev_range, limit=500):
+    """Ledger records (entry trailers, Closes/Supersedes/Refs, Tidy) in the commits of a range."""
+    raw = _git(root, 'log', f'-n{limit}', '--no-merges', '--format=%B%x1e', *rev_range)
+    n = 0
+    for body in raw.split('\x1e'):
+        for l in trailer_lines(body):
+            k = l.split(':', 1)[0]
+            if k in KINDS or k in RELATE_KEYS or k == 'Tidy':
+                n += 1
+    return n
+
+
+def _ago(seconds):
+    m = int(seconds // 60)
+    if m < 90:
+        return f'{m} min'
+    h = m // 60
+    return f'{h} h' if h < 48 else f'{h // 24} days'
+
+
+def share_state(root):
+    """Everything is read from local refs — no network. `behind` is as of the last fetch."""
+    import time
+    st = dict(branch='', upstream='', ahead=0, behind=0, unpushed=0, incoming=0, fetch_age='',
+              default='', others=[], dirty=0)
+    st['branch'] = _git(root, 'rev-parse', '--abbrev-ref', 'HEAD').strip()
+    up = _git(root, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}').strip()
+    if up and '@{u}' not in up:
+        st['upstream'] = up
+        counts = _git(root, 'rev-list', '--left-right', '--count', f'{up}...HEAD').split()
+        if len(counts) == 2:
+            st['behind'], st['ahead'] = int(counts[0]), int(counts[1])
+        if st['ahead']:
+            st['unpushed'] = _records(root, f'{up}..HEAD')
+        if st['behind']:
+            st['incoming'] = _records(root, f'HEAD..{up}')
+        common = _git(root, 'rev-parse', '--git-common-dir').strip()
+        fh = os.path.join(root, common, 'FETCH_HEAD') if not os.path.isabs(common) else os.path.join(common, 'FETCH_HEAD')
+        if os.path.exists(fh):
+            st['fetch_age'] = _ago(time.time() - os.path.getmtime(fh))
+    dflt = _git(root, 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD').strip()
+    st['default'] = dflt.split('/', 1)[1] if '/' in dflt else next(
+        (b for b in ('main', 'master') if _git(root, 'rev-parse', '--verify', '-q', b).strip()), '')
+    trees = {}
+    wt, cur = _git(root, 'worktree', 'list', '--porcelain'), None
+    for l in wt.splitlines():
+        if l.startswith('worktree '):
+            cur = l[9:]
+        elif l.startswith('branch refs/heads/') and cur:
+            trees[l[18:]] = cur
+    for b in _git(root, 'for-each-ref', '--format=%(refname:short)%09%(committerdate:unix)',
+                  'refs/heads').splitlines():
+        name, _, when = b.partition('\t')
+        if not name or name == st['branch']:
+            continue
+        n = _records(root, f'HEAD..{name}')
+        if n:
+            age = time.time() - int(when or 0)
+            st['others'].append(dict(branch=name, records=n, tree=trees.get(name, ''),
+                                     stale=age > 30 * 86400, age=_ago(age)))
+    led = _conf(root, 'LEDGER_PATH')
+    if led and _git(root, 'status', '--porcelain', '--', led).strip():
+        st['dirty'] = 1
+    return st
+
+
+def share_lines(root, index_home='', this_host='', repo_id=''):
+    """Human lines for the digest; empty when everything is shared."""
+    st, out = share_state(root), []
+    if st['unpushed']:
+        out.append(f"{st['branch']} holds {st['unpushed']} ledger record{'s' if st['unpushed'] != 1 else ''} "
+                   f"not pushed to {st['upstream']} ({st['ahead']} commit{'s' if st['ahead'] != 1 else ''}) — "
+                   f"other machines and collaborators cannot see them yet")
+    if st['incoming']:
+        out.append(f"{st['upstream']} has {st['incoming']} ledger record{'s' if st['incoming'] != 1 else ''} "
+                   f"not pulled here (as of the last fetch{', ' + st['fetch_age'] + ' ago' if st['fetch_age'] else ''})")
+    for o in st['others'][:5]:
+        where = f" (worktree {_tilde(o['tree'])})" if o['tree'] else ''
+        stale = f"; last commit {o['age']} ago — abandoned?" if o['stale'] else ''
+        out.append(f"branch {o['branch']}{where} holds {o['records']} ledger record"
+                   f"{'s' if o['records'] != 1 else ''} not in {st['branch']}{stale}")
+    if index_home and repo_id:
+        for path in sorted(__import__('glob').glob(os.path.join(index_home, 'hosts', '*.tsv'))):
+            host = os.path.basename(path)[:-4]
+            if host == this_host:
+                continue
+            try:
+                rows = io.open(path, encoding='utf-8').read().splitlines()
+            except OSError:
+                continue
+            for r in rows:
+                f = r.split('\t')
+                if len(f) >= 10 and f[0] == repo_id and (f[6] not in ('', '0') or f[7]):
+                    bits = []
+                    if f[6] not in ('', '0'):
+                        bits.append(f"{f[6]} ledger records not pushed from {f[2]}")
+                    if f[7]:
+                        bits.append('unmerged branches ' + f[7].replace(',', ', '))
+                    out.append(f"on {host} (as of {f[9]}): " + '; '.join(bits))
+    return out
+
+
+def share_tsv(root):
+    st = share_state(root)
+    others = ','.join(f"{o['branch']}:{o['records']}" for o in st['others'])
+    return '\t'.join(str(x) for x in (st['branch'], st['upstream'] or '-', st['ahead'], st['behind'],
+                                      st['unpushed'], others, st['dirty']))
+
+
+def cmd_share_state(argv):
+    if len(argv) > 1 and argv[1] == '--tsv':
+        return share_tsv(argv[0])
+    extra = argv[1:4] if len(argv) >= 4 else ['', '', '']
+    return '\n'.join(share_lines(argv[0], *extra))
+
+
+# --- the Lore query side: what history says about a path -------------------------------------
+
+LORE_QUERY = ('Directive', 'Constraint', 'Rejected', 'Not-tested', 'Tested', 'Confidence',
+              'Scope-risk', 'Reversibility', 'Related')
+NOT_CODE = ('.claude/', '.githooks/')
+
+
+def lore_commits(root, *paths, limit=2000):
+    """Commits carrying Lore trailers, newest first:
+    [dict(sha, date, subject, trailers=[(key, value)], files=[...])]. With paths: only commits
+    that touched them."""
+    raw = _git(root, 'log', f'-n{limit}', '--no-merges', '--date=short', '--name-only',
+               '--format=%x1e%h%x1f%ad%x1f%s%x1f%B%x1f', *(['--'] + list(paths) if paths else []))
+    led = _conf(root, 'LEDGER_PATH')
+    dec = _conf(root, 'DECISIONS_PATH')
+    out = []
+    for rec in raw.split('\x1e'):
+        f = rec.split('\x1f')
+        if len(f) < 5:
+            continue
+        sha, date, subj, body, tail = f[0].strip(), f[1].strip(), f[2].strip(), f[3], f[4]
+        tr = [(l.split(':', 1)[0], l.split(':', 1)[1].strip()) for l in trailer_lines(body)
+              if l.split(':', 1)[0] in LORE_QUERY]
+        if not tr:
+            continue
+        files = [x for x in tail.splitlines() if x.strip() and x not in (led, dec)
+                 and not x.startswith(NOT_CODE)]
+        out.append(dict(sha=sha, date=date, subject=subj, trailers=tr, files=files))
+    return out
+
+
+def _entries_by_commit(ledger):
+    m = {}
+    for e in parse_entries(ledger):
+        c = entry_commit(e)
+        if c:
+            m.setdefault(c[:7], []).append(e)
+    return m
+
+
+def _rel(root, path):
+    ap = path if os.path.isabs(path) else os.path.join(os.getcwd(), path)
+    rp = os.path.relpath(ap, root)
+    return path if rp.startswith('..') else rp
+
+
+def context(root, ledger, path, only=None):
+    """The paper's `lore context <path>`: everything history says about a file or directory,
+    before an agent changes it."""
+    path = _rel(root, path)
+    byc = _entries_by_commit(ledger)
+    groups = {k: [] for k in ('Directive', 'Constraint', 'Rejected', 'Not-tested')}
+    for c in lore_commits(root, path, limit=500):
+        ents = byc.get(c['sha'][:7], [])
+        dead = ents and all(is_dead(e) for e in ents)
+        tag = f"{c['sha']} {c['date']}" + (f" · {', '.join(e['id'] for e in ents)}" if ents else '')
+        if dead:
+            tag += ' · its entry is superseded/closed — may no longer hold'
+        for k, v in c['trailers']:
+            if k in groups and (only is None or k == only):
+                groups[k].append(f"- {v}  ({tag})")
+    out = [f"# What the ledger and history say about {path}", ""]
+    titles = {'Directive': 'Directives — instructions to whoever changes this next',
+              'Constraint': 'Constraints — rules that shaped it and may still hold',
+              'Rejected': 'Rejected alternatives — do not re-propose without new evidence',
+              'Not-tested': 'Known untested'}
+    for k, t in titles.items():
+        if groups[k]:
+            out += [f"## {t}", *groups[k], ""]
+    if only is None:
+        shas = {x[:7] for x in _git(root, 'log', '-n1000', '--format=%h', '--', path).split()}
+        ents = [e for e in parse_entries(ledger) if entry_commit(e)[:7] in shas]
+        if ents:
+            out.append("## Ledger entries made by commits that touched it")
+            out += [f"- {e['id']} · {e['status']} · {entry_text(e)[:150]}" for e in ents[:30]]
+            out.append("")
+    if len(out) == 2:
+        out.append("Nothing recorded for this path.")
+    return "\n".join(out).rstrip()
+
+
+def stale_directives(root, ledger, threshold=10, older_than_days=0):
+    """The paper's `lore stale`: directives and constraints whose code has changed a lot since
+    they were written — the ones most likely to be quietly untrue now."""
+    today = datetime.date.today()
+    byc = _entries_by_commit(ledger)
+    out = []
+    for c in lore_commits(root, limit=2000):
+        if not c['files'] or not any(k in ('Directive', 'Constraint') for k, _ in c['trailers']):
+            continue
+        ents = byc.get(c['sha'][:7], [])
+        if ents and all(is_dead(e) for e in ents):
+            continue
+        age = (today - datetime.date.fromisoformat(c['date'])).days
+        if age < older_than_days:
+            continue
+        n = int(_git(root, 'rev-list', '--count', f"{c['sha']}..HEAD", '--', *c['files'][:20]).strip() or 0)
+        if n >= threshold:
+            for k, v in c['trailers']:
+                if k in ('Directive', 'Constraint'):
+                    out.append(f"- {k}: {v[:120]}  ({c['sha']} {c['date']}; its files changed {n} "
+                               f"times since — still true?)")
+    return out
+
+
+RULES_MARK = '<!-- generated by living-ledger: regenerated every session; edit history, not this file -->'
+
+
+def write_rules(root, ledger, outdir):
+    """Path-scoped Claude Code rules generated from Directive/Constraint/Rejected trailers: each
+    loads when Claude reads a file the commit touched — the paper's constraint harvest, delivered
+    before the change instead of fetched on request. The directory is regenerated in full."""
+    byc = _entries_by_commit(ledger)
+    os.makedirs(outdir, exist_ok=True)
+    keep = set()
+    for c in lore_commits(root, limit=2000):
+        lines = [(k, v) for k, v in c['trailers'] if k in ('Directive', 'Constraint', 'Rejected')]
+        if not lines or not c['files']:
+            continue                      # a record with no files is the digest's, not a rule
+        ents = byc.get(c['sha'][:7], [])
+        if ents and all(is_dead(e) for e in ents):
+            continue
+        files = c['files']
+        if len(files) > 20:
+            common = os.path.commonpath(files) if all('/' in f for f in files) else ''
+            if not common or '.' in os.path.basename(common):
+                continue                  # a sweeping commit: too broad to scope a rule to
+            globs = [common.rstrip('/') + '/**']
+        else:
+            globs = files
+        name = f"{c['date']}-{c['sha'][:7]}.md"
+        keep.add(name)
+        ids = f" · {', '.join(e['id'] for e in ents)}" if ents else ''
+        body = ['---', 'paths:'] + [f'  - "{g.replace(chr(34), "")}"' for g in globs] + ['---', RULES_MARK,
+                f"# From the ledger — {c['sha']} ({c['date']}){ids}", f"_{c['subject']}_", '']
+        body += [f"- **{k}:** {v}" for k, v in lines]
+        text = '\n'.join(body) + '\n'
+        path = os.path.join(outdir, name)
+        try:
+            old = io.open(path, encoding='utf-8').read()
+        except OSError:
+            old = ''
+        if old != text:
+            io.open(path, 'w', encoding='utf-8').write(text)
+    for f in os.listdir(outdir):
+        if f.endswith('.md') and f not in keep:
+            os.remove(os.path.join(outdir, f))
+    return len(keep)
+
+
+def validate(root, n=20):
+    """The paper's `lore validate`: the gate's structural rules over the last n commits, for
+    history made without the hooks (another machine, a web edit, an old template)."""
+    out, bad = [], 0
+    raw = _git(root, 'log', f'-n{n}', '--no-merges', '--format=%h%x1f%an <%ae>%x1f%B%x1e')
+    for rec in raw.split('\x1e'):
+        f = rec.strip('\n').split('\x1f')
+        if len(f) < 3:
+            continue
+        probs = check_body(f[2].strip(), root, f[1], structural_only=True)
+        if probs:
+            bad += 1
+            subj = f[2].strip().splitlines()[0][:70]
+            out.append(f"- {f[0]} {subj}\n    " + "\n    ".join(p.splitlines()[0][:160] for p in probs))
+    out.insert(0, f"{bad} of the last {n} commits do not relate to the ledger as the gate requires"
+                  + (":" if bad else "."))
+    return "\n".join(out)
+
+
+CLI_HELP = """ledger — query this repo's ledger and the decision history in its commits.
+
+  ledger context <path>       everything recorded about a file or directory: directives,
+                              constraints, rejected alternatives, untested areas, entries
+  ledger directives <path>    …only the directives   (also: constraints, rejected)
+  ledger open                 open problems, questions and actions (overdue first)
+  ledger decisions            decisions in force, newest first
+  ledger retired              approaches that are dead — never re-propose these
+  ledger stale [N]            directives/constraints whose files changed >= N times since (10)
+  ledger validate [N]         check the last N commits against the ledger's commit rules (20)
+  ledger rules                regenerate .claude/rules/ledger/ from directives/constraints/rejected
+  ledger tidy                 the tidy report      ledger share   records not shared yet
+
+Works for any agent or person that can run a shell command. Writing happens only through
+commit trailers (Decision:, Finding:, Opens:, … — see the ledger's own header)."""
+
+
+def cmd_cli(argv):
+    root, cmd, rest = argv[0], (argv[1] if len(argv) > 1 else 'help'), argv[2:]
+    ledger = _ledger_path(root)
+    if cmd in ('help', '-h', '--help'):
+        return CLI_HELP
+    if not ledger or not os.path.exists(ledger):
+        return "No ledger in this repo (run /ledger-init, or install.sh <repo>)."
+    if cmd in ('context', 'directives', 'constraints', 'rejected'):
+        if not rest:
+            return f"usage: ledger {cmd} <path>"
+        only = {'directives': 'Directive', 'constraints': 'Constraint', 'rejected': 'Rejected'}.get(cmd)
+        return context(root, ledger, rest[0], only)
+    entries = parse_entries(ledger)
+    if cmd == 'open':
+        today = datetime.date.today().isoformat()
+        op = [e for e in entries if e['status'] == 'OPEN']
+        op = sorted((e for e in op if entry_due(e) and entry_due(e) <= today), key=entry_due) + \
+             [e for e in op if not (entry_due(e) and entry_due(e) <= today)]
+        return "\n".join(_one(e, width=240) for e in op) or "Nothing open."
+    if cmd == 'decisions':
+        return "\n".join(_one(e, width=240, dated=True) for e in entries
+                         if e['type'] == 'decision' and not is_dead(e)) or "No decisions in force."
+    if cmd == 'retired':
+        return "\n".join(_one(e, width=240) for e in entries
+                         if e['type'] == 'retired' and not is_dead(e)) or "Nothing retired."
+    if cmd == 'stale':
+        rows = stale_directives(root, ledger, int(rest[0]) if rest else 10)
+        return "\n".join(rows) or "No directive or constraint has seen that much change since."
+    if cmd == 'validate':
+        return validate(root, int(rest[0]) if rest else 20)
+    if cmd == 'rules':
+        n = write_rules(root, ledger, os.path.join(root, '.claude', 'rules', 'ledger'))
+        return f"{n} path-scoped rule file{'s' if n != 1 else ''} in .claude/rules/ledger/"
+    if cmd == 'tidy':
+        return tidy_report(ledger, root)
+    if cmd == 'share':
+        return "\n".join(share_lines(root)) or "Everything is shared."
+    return f"unknown command: {cmd}\n\n{CLI_HELP}"
+
+
 def cmd_id(argv):
     return hash_id(argv[0], ' '.join(argv[1:]))
 
@@ -873,7 +1396,8 @@ def main():
     mode, rest = sys.argv[1], sys.argv[2:]
     fn = {'digest': cmd_digest, 'block': cmd_block, 'stale-rules': cmd_stale_rules,
           'lint': cmd_lint, 'id': cmd_id, 'check-msg': cmd_check_msg,
-          'tidy-status': cmd_tidy_status, 'tidy-report': cmd_tidy_report}.get(mode)
+          'tidy-status': cmd_tidy_status, 'tidy-report': cmd_tidy_report,
+          'share-state': cmd_share_state, 'cli': cmd_cli}.get(mode)
     if fn is None:
         sys.exit(2)
     s = fn(rest)
