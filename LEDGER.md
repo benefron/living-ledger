@@ -127,6 +127,18 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## F-c4d9d50 · CLOSED · finding · - · 2026-09-23
+in a git worktree every commit was a silent no-op for the ledger (GIT_DIR exported to hooks made the repo root resolve to .claude/hooks)
+→ commit 4bca30c
+
+## D-ff761da · CLOSED · decision · - · 2026-09-23
+post-merge only reports what a merge brought in; the next commit records it, because git still holds the merge state while post-merge runs
+→ commit 4bca30c
+
+## D-0c2f6ea · CLOSED · decision · - · 2026-09-23
+EXTERNAL_IDS names id prefixes of another register; the gate accepts them without a ledger entry and the sync keeps them as a pointer on the entry
+→ commit 4bca30c
+
 ## D-d55748a · CLOSED · decision · - · 2026-09-23
 a tidy is suggested when the volume of work since the last Tidy: commit (entries + 3 x merges + commits / 5) passes TIDY_VOLUME over TIDY_MIN_DAYS days, or three times it in any span
 → commit a022895

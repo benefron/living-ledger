@@ -208,4 +208,6 @@ Do not hand-edit between the markers.
 | 2026-09-23 | D-b8771f2 | a tidy never deletes an entry; it compresses what is live, and there is no archive file | `a022895` |
 | 2026-09-23 | D-f72c287 | new entries are inserted by date, above the first entry dated on or before them; existing order is never rewritten | `a022895` |
 | 2026-09-23 | D-4ceef34 | Supersedes: <old> by <new> folds a duplicate into the entry that survives it | `a022895` |
+| 2026-09-23 | D-ff761da | post-merge only reports what a merge brought in; the next commit records it, because git still holds the merge state while post-merge runs | `4bca30c` |
+| 2026-09-23 | D-0c2f6ea | EXTERNAL_IDS names id prefixes of another register; the gate accepts them without a ledger entry and the sync keeps them as a pointer on the entry | `4bca30c` |
 <!-- DECISIONS_LOG_END -->
