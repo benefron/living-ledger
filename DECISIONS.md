@@ -212,4 +212,7 @@ Do not hand-edit between the markers.
 | 2026-09-23 | D-0c2f6ea | EXTERNAL_IDS names id prefixes of another register; the gate accepts them without a ledger entry and the sync keeps them as a pointer on the entry | `4bca30c` |
 | 2026-09-23 | D-3d57516 | the commit gate rejects a new entry that reads like a live one unless the commit Refs: or Supersedes: it; a Tidy: commit is exempt | `95305b5` |
 | 2026-09-23 | D-0e09e0e | an open item mirroring another register's item is proposed for closing only when every item it cites is closed there | `95305b5` |
+| 2026-09-23 | D-30f0af3 | the session digest reports ledger records not shared or not seen (unpushed, not pulled, other branches and worktrees, other machines), from local refs only, never the network | `460f296` |
+| 2026-09-23 | D-dd97495 | each machine writes its own status file into the private index, so machine names never enter a repository and two machines never conflict on it | `460f296` |
+| 2026-09-23 | D-245a95d | branch and machine state is a precondition on a tidy (merge or pull first), not a trigger for one | `460f296` |
 <!-- DECISIONS_LOG_END -->

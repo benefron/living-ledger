@@ -127,6 +127,19 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-30f0af3 · CLOSED · decision · - · 2026-09-23
+the session digest reports ledger records not shared or not seen (unpushed, not pulled, other branches and worktrees, other machines), from local refs only, never the network
+→ commit 460f296
+
+## D-dd97495 · CLOSED · decision · - · 2026-09-23
+each machine writes its own status file into the private index, so machine names never enter a repository and two machines never conflict on it
+→ commit 460f296
+
+## D-245a95d · CLOSED · decision · - · 2026-09-23
+branch and machine state is a precondition on a tidy (merge or pull first), not a trigger for one
+· Directive: the skill never pushes, pulls or merges on its own when it reports unshared records; it offers
+→ commit 460f296
+
 ## D-3d57516 · CLOSED · decision · - · 2026-09-23
 the commit gate rejects a new entry that reads like a live one unless the commit Refs: or Supersedes: it; a Tidy: commit is exempt
 → commit 95305b5
