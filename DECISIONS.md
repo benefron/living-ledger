@@ -190,4 +190,18 @@ Do not hand-edit between the markers.
 | Date | Id | One line | Commit |
 |---|---|---|---|
 <!-- DECISIONS_LOG_START -->
+| 2026-09-23 | D-a7ab56f | entry ids are content hashes of the entry text; legacy sequential ids stay valid and are never renumbered | `b789ddc` |
+| 2026-09-23 | D-fdde1b7 | the ledger is re-derived from git log since a committed SYNC_FROM floor on every run; there is no per-machine sync state | `b789ddc` |
+| 2026-09-23 | D-74f6221 | LEDGER.md and the DECISIONS.md log merge entry-wise through a git merge driver (merge=ledger), never textually | `b789ddc` |
+| 2026-09-23 | D-38e1459 | the commit gate is a git commit-msg hook that calls the sync's own trailer reader, so the gate and the sync cannot disagree | `b789ddc` |
+| 2026-09-23 | D-3c1386a | Finding: records a settled fact (STANDING); only Opens: and Action: create open items | `b789ddc` |
+| 2026-09-23 | D-6452a38 | committed git hooks are activated as per-clone shims in the hooks dir that keep existing hooks; core.hooksPath is never set | `b789ddc` |
+| 2026-09-23 | D-6741609 | reading the ledger never writes the working tree; only the post-commit hook writes it, and it commits what it writes | `b789ddc` |
+| 2026-09-23 | D-9e6cd0d | headless sessions (claude -p, SDK scripts) get no digest and run no sync | `b789ddc` |
+| 2026-09-23 | D-0700721 | a decision with no file change is recorded as an empty commit carrying the trailer, made when the decision is approved | `b789ddc` |
+| 2026-09-23 | D-a927d9e | the tool ships as a plain skill cloned into ~/.claude/skills/living-ledger, not as a plugin | `b789ddc` |
+| 2026-09-23 | D-3a1441e | the tool repository holds no user data; each user's cross-repo index is their own private repository | `b789ddc` |
+| 2026-09-23 | R-1f02f23 | a PreToolUse Bash hook as the commit gate — it sees only Claude's commits and has to parse shell to find the message | `b789ddc` |
+| 2026-09-23 | R-d027735 | core.hooksPath=.githooks to activate the committed git hooks — it switches off every hook in .git/hooks, Git LFS included | `b789ddc` |
+| 2026-09-23 | R-f047556 | sequential max+1 entry ids | `b789ddc` |
 <!-- DECISIONS_LOG_END -->

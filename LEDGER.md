@@ -126,3 +126,71 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
+
+## F-03d4225 · CLOSED · finding · - · 2026-09-23
+install.sh --upgrade committed whatever the user already had staged along with the upgrade
+→ commit fe0393a
+
+## D-a7ab56f · CLOSED · decision · - · 2026-09-23
+entry ids are content hashes of the entry text; legacy sequential ids stay valid and are never renumbered
+· Rejected: re-keying colliding sequential ids at merge time | a Closes: written on the branch then points at the wrong entry
+→ commit b789ddc
+
+## D-fdde1b7 · CLOSED · decision · - · 2026-09-23
+the ledger is re-derived from git log since a committed SYNC_FROM floor on every run; there is no per-machine sync state
+· Rejected: a gitignored per-machine bookmark | two clones of one repo derive different ledgers
+→ commit b789ddc
+
+## D-74f6221 · CLOSED · decision · - · 2026-09-23
+LEDGER.md and the DECISIONS.md log merge entry-wise through a git merge driver (merge=ledger), never textually
+→ commit b789ddc
+
+## D-38e1459 · CLOSED · decision · - · 2026-09-23
+the commit gate is a git commit-msg hook that calls the sync's own trailer reader, so the gate and the sync cannot disagree
+→ commit b789ddc
+
+## D-3c1386a · CLOSED · decision · - · 2026-09-23
+Finding: records a settled fact (STANDING); only Opens: and Action: create open items
+→ commit b789ddc
+
+## D-6452a38 · CLOSED · decision · - · 2026-09-23
+committed git hooks are activated as per-clone shims in the hooks dir that keep existing hooks; core.hooksPath is never set
+→ commit b789ddc
+
+## D-6741609 · CLOSED · decision · - · 2026-09-23
+reading the ledger never writes the working tree; only the post-commit hook writes it, and it commits what it writes
+→ commit b789ddc
+
+## D-9e6cd0d · CLOSED · decision · - · 2026-09-23
+headless sessions (claude -p, SDK scripts) get no digest and run no sync
+→ commit b789ddc
+
+## D-0700721 · CLOSED · decision · - · 2026-09-23
+a decision with no file change is recorded as an empty commit carrying the trailer, made when the decision is approved
+→ commit b789ddc
+
+## D-a927d9e · CLOSED · decision · - · 2026-09-23
+the tool ships as a plain skill cloned into ~/.claude/skills/living-ledger, not as a plugin
+· Rejected: a Claude Code plugin | its install path changes with every version and its commands are namespaced
+→ commit b789ddc
+
+## D-3a1441e · CLOSED · decision · - · 2026-09-23
+the tool repository holds no user data; each user's cross-repo index is their own private repository
+→ commit b789ddc
+
+## R-1f02f23 · STANDING · retired · - · 2026-09-23
+a PreToolUse Bash hook as the commit gate — it sees only Claude's commits and has to parse shell to find the message
+→ commit b789ddc
+
+## R-d027735 · STANDING · retired · - · 2026-09-23
+core.hooksPath=.githooks to activate the committed git hooks — it switches off every hook in .git/hooks, Git LFS included
+→ commit b789ddc
+
+## R-f047556 · STANDING · retired · - · 2026-09-23
+sequential max+1 entry ids
+→ commit b789ddc
+
+## F-5eb5445 · OPEN · finding · - · 2026-09-23
+capture still needs a commit — a decision nobody states in a session never reaches the ledger
+→ commit b789ddc
+
