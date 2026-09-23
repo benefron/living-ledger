@@ -127,6 +127,31 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-d55748a · CLOSED · decision · - · 2026-09-23
+a tidy is suggested when the volume of work since the last Tidy: commit (entries + 3 x merges + commits / 5) passes TIDY_VOLUME over TIDY_MIN_DAYS days, or three times it in any span
+→ commit a022895
+
+## D-b8771f2 · CLOSED · decision · - · 2026-09-23
+a tidy never deletes an entry; it compresses what is live, and there is no archive file
+· Rejected: an archive file for dead entries | the sync's dedup, grep and the merge driver would all have to read two files
+→ commit a022895
+
+## D-f72c287 · CLOSED · decision · - · 2026-09-23
+new entries are inserted by date, above the first entry dated on or before them; existing order is never rewritten
+→ commit a022895
+
+## D-4ceef34 · CLOSED · decision · - · 2026-09-23
+Supersedes: <old> by <new> folds a duplicate into the entry that survives it
+→ commit a022895
+
+## F-266bd4e · CLOSED · finding · - · 2026-09-23
+every session start rewrote a dashboard block's timestamp, so the index got a commit each time
+→ commit a022895
+
+## F-82b00ec · STANDING · finding · - · 2026-09-23
+about half of a research repo's 79 decisions were not about code (method, paper scope, slides, documentation) and were captured because they travelled with committed docs
+→ commit a022895
+
 ## F-a9eadb5 · CLOSED · finding · - · 2026-09-23
 the sync appended table rows into a decisions log kept as dotted lines
 → commit 85c99b5

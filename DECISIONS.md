@@ -204,4 +204,8 @@ Do not hand-edit between the markers.
 | 2026-09-23 | R-1f02f23 | a PreToolUse Bash hook as the commit gate — it sees only Claude's commits and has to parse shell to find the message | `b789ddc` |
 | 2026-09-23 | R-d027735 | core.hooksPath=.githooks to activate the committed git hooks — it switches off every hook in .git/hooks, Git LFS included | `b789ddc` |
 | 2026-09-23 | R-f047556 | sequential max+1 entry ids | `b789ddc` |
+| 2026-09-23 | D-d55748a | a tidy is suggested when the volume of work since the last Tidy: commit (entries + 3 x merges + commits / 5) passes TIDY_VOLUME over TIDY_MIN_DAYS days, or three times it in any span | `a022895` |
+| 2026-09-23 | D-b8771f2 | a tidy never deletes an entry; it compresses what is live, and there is no archive file | `a022895` |
+| 2026-09-23 | D-f72c287 | new entries are inserted by date, above the first entry dated on or before them; existing order is never rewritten | `a022895` |
+| 2026-09-23 | D-4ceef34 | Supersedes: <old> by <new> folds a duplicate into the entry that survives it | `a022895` |
 <!-- DECISIONS_LOG_END -->
