@@ -87,14 +87,15 @@ if [ -n "$SKILLV" ]; then
   for f in "$REPOS"/*.md; do
     [ -e "$f" ] || continue
     v="$(sed -n 's/.*template v\([0-9a-z]*\).*/\1/p' "$f" | head -1)"
-    [ -n "$v" ] || continue
+    id="$(basename "$f" .md)"
     case "$v" in
-      unknown) BEHIND="$BEHIND  - $(basename "$f" .md) — unstamped template" ;;
-      *) [ "$v" -lt "$SKILLV" ] 2>/dev/null && \
-           BEHIND="$BEHIND  - $(basename "$f" .md) — template v$v" ;;
+      "")       BEHIND="${BEHIND}  - $id — template v1–v2 (its block predates version stamps)
+" ;;
+      unknown)  BEHIND="${BEHIND}  - $id — unstamped template
+" ;;
+      *)        [ "$v" -lt "$SKILLV" ] 2>/dev/null && BEHIND="${BEHIND}  - $id — template v$v
+" ;;
     esac
-    BEHIND="$BEHIND
-"
   done
 fi
 
