@@ -129,142 +129,141 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 
 ## F-4e76afb · CLOSED · finding · bin · 2026-09-23
 /ledger-status left v1-v2 repos out of the 'Behind template' list and padded it with blank lines
-→ commit e351985
+→ commit 18747db
 
 ## D-30f0af3 · CLOSED · decision · - · 2026-09-23
 the session digest reports ledger records not shared or not seen (unpushed, not pulled, other branches and worktrees, other machines), from local refs only, never the network
-→ commit 460f296
+→ commit 566a218
 
 ## D-dd97495 · CLOSED · decision · - · 2026-09-23
 each machine writes its own status file into the private index, so machine names never enter a repository and two machines never conflict on it
-→ commit 460f296
+→ commit 566a218
 
 ## D-245a95d · CLOSED · decision · - · 2026-09-23
 branch and machine state is a precondition on a tidy (merge or pull first), not a trigger for one
 · Directive: the skill never pushes, pulls or merges on its own when it reports unshared records; it offers
-→ commit 460f296
+→ commit 566a218
 
 ## D-3d57516 · CLOSED · decision · - · 2026-09-23
 the commit gate rejects a new entry that reads like a live one unless the commit Refs: or Supersedes: it; a Tidy: commit is exempt
-→ commit 95305b5
+→ commit b089e4f
 
 ## D-0e09e0e · CLOSED · decision · - · 2026-09-23
 an open item mirroring another register's item is proposed for closing only when every item it cites is closed there
-→ commit 95305b5
+→ commit b089e4f
 
 ## F-b801e74 · CLOSED · finding · - · 2026-09-23
 an open list over the digest cap re-triggered "tidy due" immediately after a tidy that had just reviewed it
-→ commit 95305b5
+→ commit b089e4f
 
 ## F-4e56fa1 · CLOSED · finding · - · 2026-09-23
 the stale-rule check flagged rules that cite a closed finding on purpose, as a settled do-not-re-raise warning
-→ commit 2faf913
+→ commit fb3c9e8
 
 ## F-c4d9d50 · CLOSED · finding · - · 2026-09-23
 in a git worktree every commit was a silent no-op for the ledger (GIT_DIR exported to hooks made the repo root resolve to .claude/hooks)
-→ commit 4bca30c
+→ commit fc9d6cc
 
 ## D-ff761da · CLOSED · decision · - · 2026-09-23
 post-merge only reports what a merge brought in; the next commit records it, because git still holds the merge state while post-merge runs
-→ commit 4bca30c
+→ commit fc9d6cc
 
 ## D-0c2f6ea · CLOSED · decision · - · 2026-09-23
 EXTERNAL_IDS names id prefixes of another register; the gate accepts them without a ledger entry and the sync keeps them as a pointer on the entry
-→ commit 4bca30c
+→ commit fc9d6cc
 
 ## D-d55748a · CLOSED · decision · - · 2026-09-23
 a tidy is suggested when the volume of work since the last Tidy: commit (entries + 3 x merges + commits / 5) passes TIDY_VOLUME over TIDY_MIN_DAYS days, or three times it in any span
-→ commit a022895
+→ commit 0025af7
 
 ## D-b8771f2 · CLOSED · decision · - · 2026-09-23
 a tidy never deletes an entry; it compresses what is live, and there is no archive file
 · Rejected: an archive file for dead entries | the sync's dedup, grep and the merge driver would all have to read two files
-→ commit a022895
+→ commit 0025af7
 
 ## D-f72c287 · CLOSED · decision · - · 2026-09-23
 new entries are inserted by date, above the first entry dated on or before them; existing order is never rewritten
-→ commit a022895
+→ commit 0025af7
 
 ## D-4ceef34 · CLOSED · decision · - · 2026-09-23
 Supersedes: <old> by <new> folds a duplicate into the entry that survives it
-→ commit a022895
+→ commit 0025af7
 
 ## F-266bd4e · CLOSED · finding · - · 2026-09-23
 every session start rewrote a dashboard block's timestamp, so the index got a commit each time
-→ commit a022895
+→ commit 0025af7
 
 ## F-82b00ec · STANDING · finding · - · 2026-09-23
 about half of a research repo's 79 decisions were not about code (method, paper scope, slides, documentation) and were captured because they travelled with committed docs
-→ commit a022895
+→ commit 0025af7
 
 ## F-a9eadb5 · CLOSED · finding · - · 2026-09-23
 the sync appended table rows into a decisions log kept as dotted lines
-→ commit 85c99b5
+→ commit 8d1b1f8
 
 ## F-03d4225 · CLOSED · finding · - · 2026-09-23
 install.sh --upgrade committed whatever the user already had staged along with the upgrade
-→ commit fe0393a
+→ commit 977a250
 
 ## D-a7ab56f · CLOSED · decision · - · 2026-09-23
 entry ids are content hashes of the entry text; legacy sequential ids stay valid and are never renumbered
 · Rejected: re-keying colliding sequential ids at merge time | a Closes: written on the branch then points at the wrong entry
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## D-fdde1b7 · CLOSED · decision · - · 2026-09-23
 the ledger is re-derived from git log since a committed SYNC_FROM floor on every run; there is no per-machine sync state
 · Rejected: a gitignored per-machine bookmark | two clones of one repo derive different ledgers
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## D-74f6221 · CLOSED · decision · - · 2026-09-23
 LEDGER.md and the DECISIONS.md log merge entry-wise through a git merge driver (merge=ledger), never textually
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## D-38e1459 · CLOSED · decision · - · 2026-09-23
 the commit gate is a git commit-msg hook that calls the sync's own trailer reader, so the gate and the sync cannot disagree
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## D-3c1386a · CLOSED · decision · - · 2026-09-23
 Finding: records a settled fact (STANDING); only Opens: and Action: create open items
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## D-6452a38 · CLOSED · decision · - · 2026-09-23
 committed git hooks are activated as per-clone shims in the hooks dir that keep existing hooks; core.hooksPath is never set
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## D-6741609 · CLOSED · decision · - · 2026-09-23
 reading the ledger never writes the working tree; only the post-commit hook writes it, and it commits what it writes
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## D-9e6cd0d · CLOSED · decision · - · 2026-09-23
 headless sessions (claude -p, SDK scripts) get no digest and run no sync
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## D-0700721 · CLOSED · decision · - · 2026-09-23
 a decision with no file change is recorded as an empty commit carrying the trailer, made when the decision is approved
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## D-a927d9e · CLOSED · decision · - · 2026-09-23
 the tool ships as a plain skill cloned into ~/.claude/skills/living-ledger, not as a plugin
 · Rejected: a Claude Code plugin | its install path changes with every version and its commands are namespaced
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## D-3a1441e · CLOSED · decision · - · 2026-09-23
 the tool repository holds no user data; each user's cross-repo index is their own private repository
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## R-1f02f23 · STANDING · retired · - · 2026-09-23
 a PreToolUse Bash hook as the commit gate — it sees only Claude's commits and has to parse shell to find the message
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## R-d027735 · STANDING · retired · - · 2026-09-23
 core.hooksPath=.githooks to activate the committed git hooks — it switches off every hook in .git/hooks, Git LFS included
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## R-f047556 · STANDING · retired · - · 2026-09-23
 sequential max+1 entry ids
-→ commit b789ddc
+→ commit 9d9fbe4
 
 ## F-5eb5445 · OPEN · finding · - · 2026-09-23
 capture still needs a commit — a decision nobody states in a session never reaches the ledger
-→ commit b789ddc
-
+→ commit 9d9fbe4
