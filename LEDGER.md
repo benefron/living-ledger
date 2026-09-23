@@ -127,6 +127,10 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## F-4e76afb · CLOSED · finding · bin · 2026-09-23
+/ledger-status left v1-v2 repos out of the 'Behind template' list and padded it with blank lines
+→ commit e351985
+
 ## D-30f0af3 · CLOSED · decision · - · 2026-09-23
 the session digest reports ledger records not shared or not seen (unpushed, not pulled, other branches and worktrees, other machines), from local refs only, never the network
 → commit 460f296
