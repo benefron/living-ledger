@@ -136,6 +136,18 @@ class MergeTests(unittest.TestCase):
         self.assertLess(out.index('D-001'), out.index('D-2222222'))
         self.assertLess(out.index('D-2222222'), out.index('D-3333333'))
 
+    def test_decisions_log_dotted_rows_union(self):
+        head = "# D\n\n<!-- DECISIONS_LOG_START -->\n"
+        tail = "<!-- DECISIONS_LOG_END -->\n"
+        r1 = "2026-09-01 · D-001 · first · aaa\n"
+        base = head + r1 + tail
+        ours = head + r1 + "2026-09-03 · D-3333333 · ours · ccc\n" + tail
+        theirs = head + r1 + "2026-09-02 · D-2222222 · theirs · bbb\n" + tail
+        rc, out, _ = run_merge(base, ours, theirs)
+        self.assertEqual(rc, 0)
+        self.assertEqual(out.count('D-001'), 1)
+        self.assertLess(out.index('D-2222222'), out.index('D-3333333'))
+
     def test_block_newest_stamp_wins(self):
         ours = "## r\n_rebuilt 2026-09-20T10:00:00Z_\nHEAD a\n"
         theirs = "## r\n_rebuilt 2026-09-22T10:00:00Z_\nHEAD b\n"

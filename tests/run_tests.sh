@@ -356,6 +356,18 @@ check "hand-set AUDIENCE_SURFACE preserved"    "grep -qx 'AUDIENCE_SURFACE=paper
 check "tree clean after --upgrade"             "[ -z \"\$(git -C '$U3' status --porcelain)\" ]"
 check "second --upgrade is a no-op" "N=\$(git -C '$U3' rev-list --count HEAD); '$INSTALL' '$U3' --upgrade --quiet; [ \$(git -C '$U3' rev-list --count HEAD) -eq \$N ]"
 
+DL="$(newrepo dotted)"; installed "$DL"
+python3 - "$DL/DECISIONS.md" <<'PYX'
+import io, sys
+p = sys.argv[1]; s = io.open(p).read()
+s = s.replace('<!-- DECISIONS_LOG_START -->', '<!-- DECISIONS_LOG_START -->\n\n2026-01-01 · D-001 · an older decision · abc1234')
+io.open(p, 'w').write(s)
+PYX
+git -C "$DL" add -A; commit "$DL" "x
+Ledger: none — a log kept as dotted lines"
+hc "$DL" -m "x" -m "Decision: the log keeps its own row style"
+check "a dotted decisions log gets dotted rows" "grep -q '^20[0-9-]* · $(hid D 'the log keeps its own row style') · the log keeps its own row style · ' '$DL/DECISIONS.md' && ! grep -q '^| ' <(sed -n '/LOG_START/,/LOG_END/p' '$DL/DECISIONS.md')"
+
 # ---------------------------------------------------------------------------
 echo "13. dashboard, status and the index"
 IDX="$LL_HOME_DIR/ledger"

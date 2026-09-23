@@ -214,7 +214,7 @@ def merge_decisions(base, ours, theirs):
     for line in orows.splitlines() + trows.splitlines():
         if not line.strip():
             continue
-        m = re.match(r'^\|\s*([^|]*?)\s*\|\s*(\S+)\s*\|', line)
+        m = re.match(r'^\|?\s*(\d{4}-\d{2}-\d{2}[^|·]*?)\s*[|·]\s*(\S+)\s*[|·]', line)
         key = m.group(2) if m else line.strip()
         if key in seen:
             continue

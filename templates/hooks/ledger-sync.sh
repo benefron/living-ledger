@@ -244,10 +244,15 @@ if log_rows and DECISIONS:
         head, _, rest = d.partition(START)
         rows, _, tail = rest.partition(END)
         added = []
+        # follow the log's existing row style: a markdown table (default) or `date · id · …` lines
+        dotted = bool(re.search(r'^\d{4}-\d{2}-\d{2} · ', rows, re.M)) and '| ' not in rows
         for date, eid, text, sha in log_rows:
-            if f'| {eid} |' in rows:
+            if re.search(rf'(^|[|·] ?){re.escape(eid)}( ?[|·]|$)', rows, re.M):
                 continue
-            added.append(f'| {date} | {eid} | {text.replace("|", chr(92) + "|").strip()} | `{sha}` |')
+            if dotted:
+                added.append(f'{date} · {eid} · {text.strip()} · {sha}')
+            else:
+                added.append(f'| {date} | {eid} | {text.replace("|", chr(92) + "|").strip()} | `{sha}` |')
         if added:
             rows = '\n' + rows.strip('\n') + ('\n' if rows.strip('\n') else '') + '\n'.join(added) + '\n'
             io.open(DECISIONS, 'w', encoding='utf-8').write(head + START + rows + END + tail)
