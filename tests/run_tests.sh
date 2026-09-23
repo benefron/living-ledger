@@ -291,6 +291,8 @@ Closes: $CLOSED_F"
 DG="$(digest "$D")"
 check "rule citing a CLOSED finding is stale"  "printf '%s' \"\$DG\" | grep -q \"stale rule: r.md cites $CLOSED_F\""
 check "rule citing an in-force decision is NOT" "! printf '%s' \"\$DG\" | grep -q \"cites $(hid D 'this one is pinned')\""
+printf -- '- %s · CLOSED — do not re-raise it\n' "$CLOSED_F" > "$D/.claude/rules/r.md"
+check "a rule that says the entry is CLOSED is not stale" "! digest '$D' | grep -q 'stale rule: r.md'"
 
 # ---------------------------------------------------------------------------
 echo "11. branches and clones: no id collisions, no merge conflicts"

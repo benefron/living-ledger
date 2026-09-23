@@ -397,11 +397,16 @@ def stale_rules(ledger_path, rules_dir):
         except OSError:
             continue
         seen = []
-        for eid in ID_RE.findall(text):
-            st = status.get(eid)
-            if st and eid not in seen:
-                seen.append(eid)
-                out.append('stale rule: %s cites %s (%s)' % (name, eid, st))
+        for line in text.splitlines():
+            # a line that itself says the entry is closed ("F-005 · CLOSED — do not re-raise")
+            # cites it on purpose, as a settled warning: that is not stale
+            if re.search(r'(?i)\b(closed|superseded|resolved|retired)\b', line):
+                continue
+            for eid in ID_RE.findall(line):
+                st = status.get(eid)
+                if st and eid not in seen:
+                    seen.append(eid)
+                    out.append('stale rule: %s cites %s (%s)' % (name, eid, st))
     return out
 
 
