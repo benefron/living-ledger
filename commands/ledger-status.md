@@ -24,7 +24,8 @@ Trailing names filter to those repo ids.
 - the most recent decisions;
 - the flags on the header line: `N commits since last entry` (capture is lapsing — bots, the
   ledger's own sync commits and `EXEMPT_SUBJECTS` are not counted), `⚠ triage` (more open items
-  than the session digest can show), `ledger uncommitted` (a hand edit waiting to be committed),
+  than the session digest can show), `🧹 tidy due` (enough work and time since the last tidy —
+  suggest `/ledger-tidy` there), `ledger uncommitted` (a hand edit waiting to be committed),
   `template vN` in the "behind" section (run `/ledger-init --upgrade` there).
 
 Repos printed to stderr as `gone:` are registered on another machine or deleted — mention them,

@@ -40,7 +40,7 @@ import tempfile
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _ledger_parse import (ENTRIES_MARKER, hash_id, is_legacy, norm_text,  # noqa: E402
+from _ledger_parse import (ENTRIES_MARKER, HDR, hash_id, is_legacy, norm_text,  # noqa: E402
                            parse_blocks, split_ledger, entry_text, entry_commit)
 
 STATUS_RANK = {'OPEN': 0, 'STANDING': 1, 'CLOSED': 2, 'SUPERSEDED': 3}
@@ -155,7 +155,17 @@ def merge_entries(base, ours, theirs):
             continue
         top.append((eid, te['raw']))      # new on theirs
 
-    merged = [(i, r) for i, r in top if i not in out] + list(out.items())
+    # the other side's new entries go in by date — above the first entry dated on or before
+    # them — so the file stays newest-first; existing order is never rewritten
+    merged = list(out.items())
+
+    def date_of(raw):
+        m = HDR.match(raw.split('\n', 1)[0])
+        return m.group(5) if m else '9999-99-99'
+    for i, r in reversed([(i, r) for i, r in top if i not in out]):
+        d = date_of(r)
+        pos = next((k for k, (_, rr) in enumerate(merged) if date_of(rr) <= d), len(merged))
+        merged.insert(pos, (i, r))
     # One entry under two ids (a legacy counter id on one clone, a hash id derived from git on
     # the other): keep the legacy id, lift its status to the more final of the two.
     final, seen = [], {}
@@ -214,7 +224,7 @@ def merge_decisions(base, ours, theirs):
     for line in orows.splitlines() + trows.splitlines():
         if not line.strip():
             continue
-        m = re.match(r'^\|\s*([^|]*?)\s*\|\s*(\S+)\s*\|', line)
+        m = re.match(r'^\|?\s*(\d{4}-\d{2}-\d{2}[^|·]*?)\s*[|·]\s*(\S+)\s*[|·]', line)
         key = m.group(2) if m else line.strip()
         if key in seen:
             continue

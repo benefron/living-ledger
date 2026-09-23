@@ -59,8 +59,8 @@ git clone https://github.com/benefron/living-ledger ~/.claude/skills/living-ledg
 ~/.claude/skills/living-ledger/install.sh --global-only
 ```
 
-`--global-only` installs the `/ledger-init`, `/ledger-status`, `/ledger-note` and
-`/ledger-setup` commands, creates your local cross-repo index at `~/.claude/ledger/`, and adds one
+`--global-only` installs the `/ledger-init`, `/ledger-status`, `/ledger-note`, `/ledger-tidy`
+and `/ledger-setup` commands, creates your local cross-repo index at `~/.claude/ledger/`, and adds one
 user-level `SessionStart` hook (it suggests `/ledger-init` once in a repo without a ledger, and
 flags repos running an older template; `LL_NO_GLOBAL_HOOK=1` skips it).
 
@@ -92,8 +92,10 @@ In the **last paragraph** of a commit message, one per line (a long one may wrap
 | `Retires: <framing>` | an approach that is dead — never re-propose | `R-…` STANDING |
 | `Closes: <id>` | resolves an open item | → CLOSED |
 | `Supersedes: <id>` | with a `Decision:`: replaces an earlier decision | → SUPERSEDED |
+| `Supersedes: <old> by <new>` | folds a duplicate into its survivor | → SUPERSEDED |
 | `Refs: <id>, …` | relates this commit to existing entries | backlink |
 | `Ledger: none — <reason>` | the explicit opt-out (≥ 3 words of reason) | — |
+| `Tidy: <summary>` | marks a tidy pass | — |
 
 Modifiers attach to the entry trailer above them: `Due: 2026-10-01`, `Owner: sam`, `Area: hiring`,
 `Pin: yes` (keep it in every digest while in force), `Date: 2026-09-14` (decided earlier than
@@ -134,6 +136,26 @@ conversation, proposes the one-line record, and commits it when you approve.
 - **Level 2 is the commit body.** The *why* of a decision lives in the message that carried it;
   `DECISIONS.md` holds longer reasoning, append-only. See the three-levels table in the template.
 
+## Keeping it true: `/ledger-tidy`
+
+A ledger drifts the way any register does: facts left open, the same decision recorded when it
+was planned and again when it was enacted, an old decision quietly contradicted by a new one, a
+path rule citing a finding that closed weeks ago. The digest is only useful while it is true.
+
+The session digest says **Tidy due** when the *volume of work* since the last tidy — new entries,
+plus 3 per merge, plus 1 per 5 commits — has reached `TIDY_VOLUME` (25) over at least
+`TIDY_MIN_DAYS` (7) days, or three times that volume in any span (a one-day burst of fifty
+entries needs a tidy as much as a busy fortnight does), or when the open list outgrew the digest.
+Claude offers it once, at a natural pause.
+
+`/ledger-tidy` builds a report of candidates — open items that read as settled, overdue and
+aging items, near-duplicates and possible contradictions, empty entries, long-pinned entries,
+decisions whose reasoning was never written, stale rules, and other files in the repo that keep
+their own lists — proposes a fix for each, and applies what you approve in one commit
+(`Closes:`, `Supersedes: <old> by <new>`, a few status edits, and a `Tidy:` trailer the next
+check counts from). Nothing is deleted: a tidy *compresses what is live* — what the digest shows
+and a session has to weigh — while the history stays in the one file every tool reads.
+
 ## What runs where
 
 Everything is local shell + python, readable in `templates/`. Nothing phones home.
@@ -166,20 +188,28 @@ Environment: `LEDGER_SKIP=1` (skip the gate and sync for one command), `LEDGER_D
 
 ## Limitations, honestly
 
-- **Capture still takes a commit.** For non-code work that means an empty commit; Claude makes
-  it when you approve a record, but a decision nobody states never lands. The digest shows what
-  was recorded, not what was thought.
+- **Capture takes a commit.** That covers far more than code — anywhere decisions travel with
+  committed work: docs, a paper, a deck script, a plan (see the field notes). Where nothing gets
+  committed, the only path in is the empty commit Claude makes when you approve a record; a
+  decision nobody states never lands. The digest shows what was recorded, not what was thought.
 - **One extra commit per recorded commit** (`chore: ledger sync`). It is the price of keeping the
   ledger committed and identical everywhere; the dashboard does not count those.
-- **A ledger is only as good as its triage.** Open items that are really facts, or decisions
+- **A ledger is only as good as its tidying.** Open items that are really facts, or decisions
   recorded twice (once planned, once enacted), dilute the digest. The vocabulary (`Finding:` vs
-  `Opens:`, `Refs:` for enactment, `Supersedes:`) exists to prevent it; `⚠ triage` flags it.
+  `Opens:`, `Refs:` for enactment, `Supersedes:`) prevents most of it; `/ledger-tidy` folds the
+  rest, and says when it is due.
 - The digest is capped (~2–3k tokens); older material is grep-only by design.
 
 ## Field notes
 
 Developed and dogfooded across six real repositories — research code, a hardware controller, a
-data pipeline, and a non-code planning workspace. v4 is the result of auditing all six: it
+data pipeline, and a non-code planning workspace. In the research repository about half of the
+79 recorded decisions were not about code at all: scientific method (what is declared, what is
+measured and how), the scope of two papers and which repository owns what, what the slides may
+and may not claim, and how the project documents itself. They were captured because they
+travelled with committed docs and plans. The planning workspace is the counter-example: its work
+was never committed, so almost nothing was recorded — which is what the empty-commit path and
+`Due:`/`Action:`/`Pin:` are for. v4 is the result of auditing all six: it
 fixes id collisions between parallel branches and machines, trailers silently dropped when a line
 wrapped, "open" lists full of settled facts, auto-sync failing when `DECISIONS.md` was
 gitignored, `core.hooksPath` silently disabling Git LFS, and the digest leaking into headless

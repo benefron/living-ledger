@@ -34,7 +34,9 @@ The separator between header fields is ` · ` (space, U+00B7, space).
 | `Action: <line>` | `A-…` | `action` | `OPEN` |
 | `Retires: <framing>` | `R-…` | `retired` | `STANDING` |
 | `Closes: <id>` | that entry `OPEN` → `CLOSED`, plus `✓ closed by <sha> <subject>` | | |
-| `Supersedes: <id>` | that entry → `SUPERSEDED`, plus `⤳ superseded by <new ids> in <sha>` | | |
+| `Supersedes: <id>` | that entry → `SUPERSEDED`, plus `⤳ superseded by <the commit's new decisions> in <sha>` | | |
+| `Supersedes: <old> by <new>` | the same, naming the survivor — how a tidy folds a duplicate | | |
+| `Tidy: <summary>` | nothing; marks a tidy pass, from which "tidy due" counts again | | |
 | `Refs: <id>, …` | `↔ <sha> <subject>` on each; creates nothing | | |
 | `Ledger: none — <reason>` | nothing; the reasoned opt-out (≥ 3 words) | | |
 

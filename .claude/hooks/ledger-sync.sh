@@ -37,7 +37,7 @@ LEDGER_REL="${LEDGER#$REPO/}"
 # this, so reading the ledger never dirties the working tree).
 [ -n "${LL_LEDGER_FILE:-}" ] && LEDGER="$LL_LEDGER_FILE"
 
-FLOOR="$(ll_sync_floor "$REPO")"
+FLOOR="${LL_SYNC_FROM:-$(ll_sync_floor "$REPO")}"   # LL_SYNC_FROM: preview a recovery (with LL_LEDGER_FILE)
 MAX="${LL_SYNC_MAX_COMMITS:-5000}"
 if [ -n "$FLOOR" ] && git cat-file -e "${FLOOR}^{commit}" 2>/dev/null; then
   RANGE="${FLOOR}..HEAD"
@@ -56,7 +56,7 @@ import io, re, subprocess, sys
 sys.path.insert(0, sys.argv[4])
 from _ledger_parse import (ID_RE, ENTRIES_MARKER, KINDS, RELATE_KEYS, MODIFIER_KEYS, LORE_KEYS,
                            hash_id, norm_text, is_legacy, trailer_lines, parse_blocks,
-                           split_ledger, entry_text, entry_commit)
+                           split_ledger, entry_text, entry_commit, supersede_ids, insert_by_date)
 
 LEDGER, RANGE, MAX, _, DECISIONS, LEDGER_REL, DECISIONS_REL = sys.argv[1:8]
 orig = io.open(LEDGER, encoding='utf-8').read()
@@ -115,8 +115,11 @@ for rec in raw.split(SEP):
     for line in tl:
         key, _, text = line.partition(':')
         text = text.strip()
-        if key in RELATE_KEYS:
-            actions += [(key, i) for i in ID_RE.findall(text)]
+        if key == 'Supersedes':
+            olds, news = supersede_ids(text)          # `Supersedes: D-a by D-b` names the survivor
+            actions += [(key, i, news) for i in olds]
+        elif key in RELATE_KEYS:
+            actions += [(key, i, []) for i in ID_RE.findall(text)]
         elif key in KINDS and text:
             made.append(dict(key=key, text=text, extra=[]))
         elif key in MODIFIER_KEYS or key in LORE_KEYS:
@@ -169,12 +172,12 @@ for sha, date, subject, made, actions, commit_wide in commits:
                       + '\n'.join(lines) + f'\n→ commit {sha}\n')
         if typ in ('decision', 'retired'):
             log_rows.append((date, eid, text, sha))
-    new_blocks = blocks + new_blocks        # newest commit on top; trailer order within
-    for key, tid in actions:
-        closes.append((key, tid, sha, subject, ', '.join(decision_ids)))
+    new_blocks += list(reversed(blocks))    # oldest first; inserted by date, trailer order kept
+    for key, tid, by in actions:
+        closes.append((key, tid, sha, subject, ', '.join(by or decision_ids)))
 s = orig
-if new_blocks:
-    s = s.replace(ENTRIES_MARKER, ENTRIES_MARKER + '\n\n' + '\n'.join(new_blocks).rstrip() + '\n', 1)
+for b in new_blocks:
+    s = insert_by_date(s, b)
 
 
 def find_block(text, eid):
@@ -244,10 +247,15 @@ if log_rows and DECISIONS:
         head, _, rest = d.partition(START)
         rows, _, tail = rest.partition(END)
         added = []
+        # follow the log's existing row style: a markdown table (default) or `date · id · …` lines
+        dotted = bool(re.search(r'^\d{4}-\d{2}-\d{2} · ', rows, re.M)) and '| ' not in rows
         for date, eid, text, sha in log_rows:
-            if f'| {eid} |' in rows:
+            if re.search(rf'(^|[|·] ?){re.escape(eid)}( ?[|·]|$)', rows, re.M):
                 continue
-            added.append(f'| {date} | {eid} | {text.replace("|", chr(92) + "|").strip()} | `{sha}` |')
+            if dotted:
+                added.append(f'{date} · {eid} · {text.strip()} · {sha}')
+            else:
+                added.append(f'| {date} | {eid} | {text.replace("|", chr(92) + "|").strip()} | `{sha}` |')
         if added:
             rows = '\n' + rows.strip('\n') + ('\n' if rows.strip('\n') else '') + '\n'.join(added) + '\n'
             io.open(DECISIONS, 'w', encoding='utf-8').write(head + START + rows + END + tail)

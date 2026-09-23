@@ -52,6 +52,21 @@ From an audit of six repositories that ran v1–v3.
   exempt subjects; UTC stamps; the index push pulls (rebase) first and merges blocks by newest
   stamp, so two machines never reject each other.
 
+**Tidy**
+- `/ledger-tidy`: a report of what to review (open items that read as settled, overdue and aging
+  items, near-duplicates and contradictions, empty entries, long pins, decisions without written
+  reasoning, stale rules, competing registers), user-approved fixes, one commit with a `Tidy:`
+  trailer. Nothing is deleted.
+- "Tidy due" in the digest and `🧹 tidy due` on the dashboard when the volume of work since the
+  last tidy (entries + 3 x merges + commits / 5) passes `TIDY_VOLUME` over `TIDY_MIN_DAYS`, or
+  three times it in any span.
+- `Supersedes: <old> by <new>` folds a duplicate into its survivor.
+
+**From the cloud review of v3** (`44eeae6`, never merged): new entries are inserted by date, so
+late arrivals (a merge, a recovery) keep the file newest-first; an unchanged dashboard block is
+not rewritten just to move its timestamp; hash ids are never read as legacy ids (tested).
+`LL_SYNC_FROM` previews a recovery of dropped trailers without touching anything.
+
 **Upgrade** commits with `Ledger: none` (a template bump is not a project decision) and derives
 pending trailers into the same single commit.
 

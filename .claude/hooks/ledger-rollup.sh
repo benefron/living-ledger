@@ -40,7 +40,17 @@ cp "$LEDGER" "$VIEW" && LL_LEDGER_FILE="$VIEW" LL_DECISIONS_FILE="" \
   "$HERE/ledger-sync.sh" >/dev/null 2>&1 || true
 PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/_ledger_parse.py" block \
   "$VIEW" "$ID" "$REPO" "$HEAD_SHA" "$STATE" "$SINCE" "$VERSION" "$MAX_OPEN" \
-  > "$HOME_DIR/repos/$ID.md.tmp" 2>/dev/null && mv "$HOME_DIR/repos/$ID.md.tmp" "$HOME_DIR/repos/$ID.md"
+  > "$HOME_DIR/repos/$ID.md.tmp" 2>/dev/null || true
+# rewrite the block only if something other than its _rebuilt stamp changed — otherwise every
+# session start would be an index commit
+BLK="$HOME_DIR/repos/$ID.md"
+if [ -s "$BLK.tmp" ]; then
+  if [ -f "$BLK" ] && [ "$(grep -v '^_rebuilt ' "$BLK")" = "$(grep -v '^_rebuilt ' "$BLK.tmp")" ]; then
+    rm -f "$BLK.tmp"
+  else
+    mv "$BLK.tmp" "$BLK"
+  fi
+fi
 rm -f "$VIEW"
 
 # registry row: repo_id \t remote_url \t ledger_relpath \t first_seen_date

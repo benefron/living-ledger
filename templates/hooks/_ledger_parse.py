@@ -19,6 +19,13 @@ Copied verbatim into each repo as .claude/hooks/_ledger_parse.py. Entrypoints:
     _ledger_parse.py id <P> <text>
         -> the content-hash id for a new entry (e.g. F-3fa9c1e)
 
+    _ledger_parse.py tidy-status <LEDGER> <repo_root> [<max_open>]
+        -> one line saying why a tidy is due (volume of work + time since the last `Tidy:`
+           commit), or nothing
+
+    _ledger_parse.py tidy-report <LEDGER> <repo_root> [<max_open>]
+        -> the candidates a /ledger-tidy pass reviews (markdown)
+
     _ledger_parse.py check-msg <commit-msg-file> <repo_root>
         -> the commit gate (called by .githooks/commit-msg): exit 1 with the reason on stderr
            if the message does not relate to the ledger. It reads trailers with the SAME
@@ -83,9 +90,17 @@ RELATE_KEYS = ('Closes', 'Supersedes', 'Refs')   # act on existing entries by id
 MODIFIER_KEYS = ('Due', 'Owner', 'Area', 'Pin', 'Date')
 LORE_KEYS = ('Rejected', 'Constraint', 'Directive', 'Confidence', 'Scope-risk',
              'Reversibility', 'Tested', 'Not-tested', 'Related')
-LEDGER_KEYS = tuple(KINDS) + RELATE_KEYS + ('Ledger',)
+# `Tidy: <summary>` marks a /ledger-tidy pass: it creates nothing, and the next "tidy due"
+# check counts work from it.
+LEDGER_KEYS = tuple(KINDS) + RELATE_KEYS + ('Ledger', 'Tidy')
 # Keys whose value may be wrapped onto following unindented lines.
-WRAPPABLE = tuple(KINDS) + RELATE_KEYS + MODIFIER_KEYS + LORE_KEYS + ('Ledger',)
+WRAPPABLE = tuple(KINDS) + RELATE_KEYS + MODIFIER_KEYS + LORE_KEYS + ('Ledger', 'Tidy')
+
+
+def supersede_ids(val):
+    """`Supersedes: D-a, D-b by D-c` -> (['D-a', 'D-b'], ['D-c']). No `by`: (ids, [])."""
+    left, sep, right = val.partition(' by ')
+    return ID_RE.findall(left), (ID_RE.findall(right) if sep else [])
 
 TOKEN_LINE = re.compile(r'^([A-Za-z][\w-]*):[ \t]+\S')
 
@@ -195,6 +210,31 @@ def parse_entries(path):
     except OSError:
         return []
     return [e for e in parse_blocks(split_ledger(text)[1]) if e['id']]
+
+
+def insert_by_date(text, block):
+    """Insert an entry block above the first existing entry dated on or before it, so the
+    file stays newest-first even when older entries arrive late (a merge, a recovery). The
+    order of existing entries is never rewritten. Blocks inserted oldest-first land in order."""
+    m = HDR.match(block.split('\n', 1)[0])
+    date = m.group(5) if m else '9999-99-99'
+    head, sep, tail = text.partition(ENTRIES_MARKER)
+    if not sep:
+        return text
+    pos = None
+    for hm in re.finditer(r'^## .*$', tail, re.M):
+        h = HDR.match(hm.group(0))
+        if h and h.group(5) <= date:
+            pos = hm.start()
+            break
+    block = block.rstrip('\n') + '\n'
+    if pos is None:
+        tail = tail.rstrip('\n') + '\n\n' + block
+    else:
+        tail = tail[:pos] + block + '\n' + tail[pos:]
+    if not tail.startswith('\n\n'):
+        tail = '\n\n' + tail.lstrip('\n')
+    return head + sep + tail
 
 
 def entry_text(e):
@@ -413,6 +453,7 @@ def cmd_block(argv):
     version = argv[6] if len(argv) > 6 else ''
     max_open = int(argv[7]) if len(argv) > 7 else 22
     stale = stale_rules(path, os.path.join(repo_path, '.claude', 'rules'))
+    tidy = tidy_status(path, repo_path, max_open) if os.path.isdir(repo_path) else ''
     repo_path = _tilde(repo_path)
     today = datetime.date.today().isoformat()
     entries = parse_entries(path)  # file order == newest first
@@ -434,6 +475,8 @@ def cmd_block(argv):
         flags.append(f"⏰ {len(overdue)} overdue")
     if len(openi) > max_open:
         flags.append(f"⚠ triage: {len(openi)} open > digest cap {max_open}")
+    if tidy:
+        flags.append("🧹 tidy due")
 
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     ver = f" · template v{version}" if version else ""
@@ -561,6 +604,8 @@ def check_msg(msgfile, root):
                                 f"new statement in words.")
             else:
                 entries = True
+        elif key == 'Tidy':
+            related = True
         elif key in RELATE_KEYS:
             ids = ID_RE.findall(val)
             if not ids:
@@ -596,6 +641,228 @@ def cmd_check_msg(argv):
     return ''
 
 
+# --- tidy: when it is due, and what it should look at -----------------------------
+
+def _git(root, *args):
+    import subprocess
+    return subprocess.run(['git', '-C', root, *args], capture_output=True, text=True).stdout
+
+
+def _counted_commits(root, rev_range):
+    """Commits that are real work: no merges, no ledger sync commits, no [bot] authors, nothing
+    matching EXEMPT_SUBJECTS / EXEMPT_AUTHORS."""
+    exs = _conf(root, 'EXEMPT_SUBJECTS').strip('"\'')
+    exa = _conf(root, 'EXEMPT_AUTHORS').strip('"\'')
+    n = 0
+    for line in _git(root, 'log', '--no-merges', '--format=%an <%ae>%x09%s', rev_range).splitlines():
+        who, _, subj = line.partition('\t')
+        if re.match(r'(chore|docs)(\(ledger\))?: (ledger|sync ledger)', subj) or '[bot]' in who:
+            continue
+        try:
+            if (exs and re.search(exs, subj)) or (exa and re.search(exa, who)):
+                continue
+        except re.error:
+            pass
+        n += 1
+    return n
+
+
+def tidy_baseline(ledger, root):
+    """-> (sha, date, label): the last `Tidy:` commit, else the commit that created the ledger."""
+    last = _git(root, 'log', '-1', '--format=%H%x09%cs', '--grep=^Tidy:', 'HEAD').strip()
+    if last:
+        sha, date = last.split('\t')
+        return sha, date, f'the last tidy ({date})'
+    # the ledger may be read from a temp copy (the digest's view): git history needs the real path
+    rel = _conf(root, 'LEDGER_PATH') or os.path.relpath(ledger, root)
+    born = _git(root, 'log', '--diff-filter=A', '--format=%H%x09%cs', 'HEAD', '--', rel).strip()
+    if born:
+        sha, date = born.splitlines()[-1].split('\t')
+        return sha, date, f'the ledger began ({date}; never tidied)'
+    return '', '', ''
+
+
+def tidy_status(ledger, root, max_open=22):
+    """Why a tidy is due, or ''. Volume of work and time both count: a quiet month is not due,
+    a one-day burst of fifty entries is; a busy fortnight is. Thresholds: TIDY_MIN_DAYS (7) and
+    TIDY_VOLUME (25) in ledger.conf, where volume = new entries + 3 x merges + commits / 5."""
+    entries = parse_entries(ledger)
+    if not entries:
+        return ''
+    sha, base_date, label = tidy_baseline(ledger, root)
+    if not sha:
+        return ''
+    tidied = label.startswith('the last tidy')
+    new = [e for e in entries if (e['date'] > base_date if tidied else e['date'] >= base_date)
+           or not tidied]
+    commits = _counted_commits(root, f'{sha}..HEAD')
+    merges = len(_git(root, 'rev-list', '--merges', f'{sha}..HEAD').split())
+    days = (datetime.date.today() - datetime.date.fromisoformat(base_date)).days
+    openi = sum(1 for e in entries if e['status'] == 'OPEN')
+    try:
+        min_days = int(_conf(root, 'TIDY_MIN_DAYS') or 7)
+        vol_need = int(_conf(root, 'TIDY_VOLUME') or 25)
+    except ValueError:
+        min_days, vol_need = 7, 25
+    volume = len(new) + 3 * merges + commits // 5
+    due = (days >= min_days and volume >= vol_need) or volume >= 3 * vol_need or openi > max_open
+    if not due:
+        return ''
+    why = (f"{len(new)} new entries, {merges} merge{'s' if merges != 1 else ''} and "
+           f"{commits} commit{'s' if commits != 1 else ''} over {days} day{'s' if days != 1 else ''} "
+           f"since {label}")
+    if openi > max_open:
+        why += f"; {openi} open items, over the digest cap of {max_open}"
+    return why
+
+
+def cmd_tidy_status(argv):
+    return tidy_status(argv[0], argv[1], int(argv[2]) if len(argv) > 2 else 22)
+
+
+STOP = set('the a an and or of to in on for with by is are be as at from that this it its not no '
+           'into than then when only each every one two all any must should can will was were has '
+           'have had but so if per via use used uses using new now also more less same'.split())
+
+
+def _toks(text):
+    return {w for w in re.findall(r'[a-z0-9_]{3,}', text.lower()) if w not in STOP}
+
+
+def tidy_report(ledger, root, max_open=22):
+    """The candidates a tidy pass reviews. Heuristics only — every item is a proposal for the
+    user to accept, edit or decline, never an automatic change."""
+    entries = parse_entries(ledger)
+    today = datetime.date.today()
+    out = []
+    status = tidy_status(ledger, root, max_open)
+    sha, base_date, label = tidy_baseline(ledger, root)
+    live = [e for e in entries if not is_dead(e)]
+    openi = [e for e in entries if e['status'] == 'OPEN']
+    by_commit = {}
+    for e in entries:
+        by_commit.setdefault(entry_commit(e), []).append(e)
+
+    def line(e, why, act, width=90):
+        return f"- {e['id']} · {entry_text(e)[:width]} — {why} → {act}"
+
+    def section(title, items, cap=25):
+        if items:
+            out.append(f"## {title} ({len(items)})")
+            out.extend(items[:cap])
+            if len(items) > cap:
+                out.append(f"- …{len(items) - cap} more")
+            out.append('')
+
+    out.append(f"# Ledger tidy report — {_conf(root, 'LEDGER_PATH') or os.path.relpath(ledger, root)}")
+    out.append('')
+    out.append(f"{len(entries)} entries · {len(live)} live · {len(openi)} open · since {label or 'n/a'}"
+               + (f" · due: {status}" if status else " · not due yet"))
+    out.append('')
+
+    # 1. open items that look settled
+    settled = []
+    fact = re.compile(r'\b(fixed|resolved|reproduc\w*|confirm\w*|refuted|verified|no change (is )?needed|'
+                      r'now (passes|works)|measured|holds|is correct)\b', re.I)
+    for e in openi:
+        c = entry_commit(e)
+        partners = [x['id'] for x in by_commit.get(c, []) if x is not e and x['type'] == 'decision'] if c else []
+        subj = _git(root, 'show', '-s', '--format=%s', c).strip() if c else ''
+        if fact.search(entry_text(e)):
+            settled.append(line(e, 'reads like a settled result', 'STANDING (a fact) or CLOSED'))
+        elif partners:
+            settled.append(line(e, f'opened in the same commit as {", ".join(partners)}',
+                                'CLOSED if that decision resolved it'))
+        elif re.match(r'fix\b|fix[(:]', subj):
+            settled.append(line(e, f'born in a fix commit ({c})', 'CLOSED if the fix covers it'))
+    section('Open, but possibly settled', settled)
+
+    # 2. overdue and aging open items
+    aging = []
+    for e in openi:
+        due = entry_due(e)
+        age = (today - datetime.date.fromisoformat(e['date'])).days
+        if due and due <= today.isoformat():
+            aging.append(line(e, f'overdue since {due}', 'close, re-date (new Due:) or drop'))
+        elif age > 30 and not any(l[:1] in ('↔', '✓') for l in e['lines']):
+            aging.append(line(e, f'open {age} days, never referenced since', 'still real? close or keep'))
+    section('Overdue or aging', aging)
+
+    # 3. near-duplicates and possible contradictions among live entries of one type
+    dups = []
+    for typ in ('decision', 'finding', 'action', 'retired'):
+        group = [(e, _toks(entry_text(e))) for e in live if e['type'] == typ]
+        for i in range(len(group)):
+            a, ta = group[i]
+            if len(ta) < 3:
+                continue
+            for b, tb in group[i + 1:]:
+                if len(tb) < 3:
+                    continue
+                # Jaccard catches rewordings; the overlap coefficient catches a short restatement
+                # of a longer entry, but only on entries long enough not to match by accident.
+                # Measured on real ledgers: no false positives at these settings.
+                shared = len(ta & tb)
+                if shared / len(ta | tb) >= 0.3 or (min(len(ta), len(tb)) >= 5
+                                                    and shared / min(len(ta), len(tb)) >= 0.6):
+                    dups.append(f"- {a['id']} ≈ {b['id']} · {entry_text(a)[:60]} | {entry_text(b)[:60]}"
+                                f" → same thing (Supersedes: <older> by <newer>), a refinement, or a"
+                                f" contradiction to settle")
+    section('Similar entries — duplicate, refinement or contradiction?', dups)
+
+    # 4. entries with no content of their own
+    junk = [line(e, 'no content of its own', 'Supersedes: <it> by <the real entry>, or reword by hand')
+            for e in live if len(entry_text(e).split()) <= 2 or re.fullmatch(ID_PAT, entry_text(e).strip())]
+    section('Empty or id-only entries', junk)
+
+    # 5. pinned entries worth re-confirming
+    pins = [line(e, f'pinned since {e["date"]}', 'still in force? keep, or unpin (delete the · Pinned line)')
+            for e in live if entry_pinned(e)
+            and (today - datetime.date.fromisoformat(e['date'])).days > 60]
+    section('Pinned for over 60 days', pins)
+
+    # 6. recent decisions whose reasoning was never written down
+    dec_rel = _conf(root, 'DECISIONS_PATH')
+    try:
+        dec_text = io.open(os.path.join(root, dec_rel), encoding='utf-8').read() if dec_rel else ''
+    except OSError:
+        dec_text = ''
+    thin = []
+    for e in live:
+        if e['type'] != 'decision' or not base_date or e['date'] < base_date or e['id'] in dec_text.split(
+                '<!-- DECISIONS_LOG_START -->')[0]:
+            continue
+        c = entry_commit(e)
+        if not c:
+            continue                      # hand-written / backfilled: its evidence is elsewhere
+        body = _git(root, 'show', '-s', '--format=%B', c)
+        paras = [p for p in re.split(r'\n\s*\n', body.strip())[1:] if p.strip()]
+        prose = [p for p in paras if _trailer_para([l for l in p.splitlines() if l.strip()]) is None]
+        if not prose:
+            thin.append(line(e, 'no reasoning in its commit body or DECISIONS.md', 'add a DECISIONS.md section, or accept as self-evident'))
+    section('Decisions with no written reasoning', thin, cap=15)
+
+    # 7. rules and headers
+    rules = stale_rules(ledger, os.path.join(root, '.claude', 'rules'))
+    section('Stale path-scoped rules', [f"- {r}" for r in rules])
+    section('Lint', [f"- {x}" for x in lint(ledger)])
+
+    # 8. other registers that can drift from this one
+    led_rel = _conf(root, 'LEDGER_PATH') or os.path.relpath(ledger, root)
+    others = [f for f in _git(root, 'ls-files').splitlines()
+              if re.search(r'(?i)(retired|concern|decision|adr|handoff|status)[^/]*\.md$', f)
+              and f not in (led_rel, dec_rel)]
+    section('Other registers to keep consistent (or reduce to a pointer)', [f"- {f}" for f in others], cap=12)
+
+    if len(out) <= 4:
+        out.append("Nothing to tidy.")
+    return "\n".join(out)
+
+
+def cmd_tidy_report(argv):
+    return tidy_report(argv[0], argv[1], int(argv[2]) if len(argv) > 2 else 22)
+
+
 def cmd_id(argv):
     return hash_id(argv[0], ' '.join(argv[1:]))
 
@@ -605,7 +872,8 @@ def main():
         sys.exit(2)
     mode, rest = sys.argv[1], sys.argv[2:]
     fn = {'digest': cmd_digest, 'block': cmd_block, 'stale-rules': cmd_stale_rules,
-          'lint': cmd_lint, 'id': cmd_id, 'check-msg': cmd_check_msg}.get(mode)
+          'lint': cmd_lint, 'id': cmd_id, 'check-msg': cmd_check_msg,
+          'tidy-status': cmd_tidy_status, 'tidy-report': cmd_tidy_report}.get(mode)
     if fn is None:
         sys.exit(2)
     s = fn(rest)

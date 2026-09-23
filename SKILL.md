@@ -12,9 +12,10 @@ description: >-
   to-do or deadline worth tracking ("we need to", "by Friday", "waiting on"); (e) asks to
   capture or orient ("note that", "remember that", "where did we land on", "what's still open",
   "did we decide", "catch me up", "is this still current"); (f) asks across repos ("what's open
-  across my projects", "which repos need attention"); or (g) sets up tracking, or runs /init in a
-  repo with no LEDGER.md. Also handles /ledger-init, /ledger-status, /ledger-note,
-  /ledger-setup. Implements the Lore pattern (git commit trailers as a structured knowledge
+  across my projects", "which repos need attention"); (g) wants the ledger cleaned up ("tidy the
+  ledger", "clean up the open list", "compress the ledger", "the digest is noisy"); or (h) sets up
+  tracking, or runs /init in a repo with no LEDGER.md. Also handles /ledger-init, /ledger-status,
+  /ledger-note, /ledger-tidy, /ledger-setup. Implements the Lore pattern (git commit trailers as a structured knowledge
   protocol, arXiv:2603.15566). Do NOT use for ordinary code edits, or for questions the injected
   ledger digest already answers.
 ---
@@ -44,9 +45,10 @@ In the **last paragraph** of a commit message, one per line (a long one may wrap
 | `Action: <one line>` | a to-do (pair with `Due:` / `Owner:`) | `A-…` OPEN |
 | `Retires: <framing>` | an approach that is now dead — never re-propose | `R-…` STANDING |
 | `Closes: <id>` | resolves an open finding / action | → CLOSED, `✓ closed by <sha>` |
-| `Supersedes: <id>` | with a new `Decision:` — the old one is replaced | → SUPERSEDED, `⤳ superseded by` |
+| `Supersedes: <id>` | with a new `Decision:` — the old one is replaced; or `Supersedes: <old> by <new>` to fold a duplicate into its survivor | → SUPERSEDED, `⤳ superseded by` |
 | `Refs: <id>, <id>` | this commit relates to existing entries | `↔ <sha> <subject>` backlink |
 | `Ledger: none — <reason>` | explicit opt-out; reason ≥ 3 words | nothing |
+| `Tidy: <summary>` | marks a `/ledger-tidy` pass (see below) | nothing |
 
 **Modifiers** shape the entry trailer directly above them: `Due: YYYY-MM-DD`, `Owner: <who>`,
 `Area: <tag>`, `Pin: yes` (keep it in the digest while in force), `Date: YYYY-MM-DD` (decided
@@ -116,8 +118,19 @@ unless the user declines.
 - *stale rule* — a `.claude/rules/*.md` cites a closed finding or superseded decision; update or
   delete it (it is telling every session something untrue).
 - *ledger lint* — a malformed or duplicate entry header; fix it by hand.
-- *over the digest cap* — too many open items to show; triage (close, supersede, or turn
-  settled facts into `STANDING`).
+- *over the digest cap* — too many open items to show; that makes a tidy due.
+- *Tidy due* — the volume of work since the last tidy (new entries, merges, commits) has passed
+  the threshold over enough days. Offer `/ledger-tidy` **once**, at a natural pause — the start
+  of a session or the end of a chunk, never mid-task — with the reason from the digest in one
+  line. If the user declines, drop it for the session.
+
+### "tidy the ledger" / "clean up the open list" / "compress the ledger"
+
+Run `/ledger-tidy`: it reports candidates (open items that read as settled, overdue or aging
+items, near-duplicates and possible contradictions, empty entries, stale rules, other files that
+keep their own lists), you propose in batches, the user approves, and one commit applies it
+with a `Tidy:` trailer. It never deletes an entry — compression means fewer **live** entries,
+not a second file.
 
 ### A repo with no ledger, about to get its first commit
 
@@ -151,6 +164,6 @@ tagged `(backfilled)` / `(from <sha>)`, evidence pointing at **tracked** files o
 - `templates/` — `LEDGER.md`, `DECISIONS.md`, `ledger.conf`, `hooks/` (digest, sync, merge
   driver, rollup, index push, activate, parser), `githooks/` (commit-msg, post-commit), `rules/`
 - `lib/common.sh` — shell helpers (copied into each repo as `_ledger_lib.sh`)
-- `commands/` — `/ledger-init`, `/ledger-status`, `/ledger-note`, `/ledger-setup`
+- `commands/` — `/ledger-init`, `/ledger-status`, `/ledger-note`, `/ledger-tidy`, `/ledger-setup`
 - `reference/entry-format.md` — the entry schema · `reference/lore-paper.md` — the paper
 - `tests/` — `bash tests/run_tests.sh` (end to end) · `python3 tests/test_merge.py`

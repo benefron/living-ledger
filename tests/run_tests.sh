@@ -21,6 +21,11 @@ ok()   { PASS=$((PASS+1)); printf '  ok   %s\n' "$1"; }
 bad()  { FAIL=$((FAIL+1)); printf '  FAIL %s\n' "$1"; [ -n "${2:-}" ] && printf '       %s\n' "$2"; }
 check(){ if eval "$2"; then ok "$1"; else bad "$1" "${3:-}"; fi; }
 
+ghas() {  # ghas <pattern> <git args...> — buffered: `git … | grep -q` under pipefail SIGPIPEs git
+  local pat="$1"; shift
+  git "$@" > "$WORK/.ghas" 2>/dev/null
+  grep -q "$pat" "$WORK/.ghas"
+}
 NOHOOKS="$WORK/nohooks"; mkdir -p "$NOHOOKS"
 newrepo() {  # newrepo <name> -> path (one root commit, no ledger)
   local d="$WORK/$1"; mkdir -p "$d"; git -C "$d" init -q
@@ -403,6 +408,68 @@ check "newest block stamp won"                 "grep -q 'machine-2 block' '$IDX/
 git -C "$IDX" remote set-url origin "$WORK/nowhere.git"; CLAUDE_PROJECT_DIR="$P" "$P/.claude/hooks/ledger-rollup.sh"
 OUT="$("$PUSH" --timeout 2)"
 check "unreachable remote: one line, no failure" "[ \$(printf '%s' \"\$OUT\" | grep -c 'unpushed') -eq 1 ]"
+
+# ---------------------------------------------------------------------------
+echo "13b. entries arrive by date; Supersedes: … by …; dashboard does not churn"
+O="$(newrepo order)"; installed "$O"
+commit "$O" "feat: new
+
+Decision: a decision made today"
+GIT_AUTHOR_DATE="2020-05-05T10:00:00" git -C "$O" -c core.hooksPath="$NOHOOKS" commit -q --allow-empty -m "feat: old
+
+Decision: a decision from long ago"
+sync_ "$O"
+check "an older entry lands below a newer one" "hdrs '$O' | head -1 | grep -q \"$(hid D 'a decision made today')\""
+OLDD="$(hid D 'a decision from long ago')"; NEWD="$(hid D 'a decision made today')"
+hc "$O" -m "tidy" -m "Supersedes: $OLDD by $NEWD
+Tidy: one duplicate folded"
+check "Supersedes: X by Y points at the survivor" "blk '$O' $OLDD | grep -q \"⤳ superseded by $NEWD\" && grep -q \"^## $NEWD · CLOSED\" '$O/LEDGER.md'"
+check "a Tidy: trailer alone passes the gate" "ghas '^Tidy:' -C '$O' log --format=%B -2"
+ID13="$(sed -n 's/^REPO_ID=//p' "$O/.claude/ledger.conf")"
+CLAUDE_PROJECT_DIR="$O" "$O/.claude/hooks/ledger-rollup.sh"; M1="$(stat -f %m "$IDX/repos/$ID13.md" 2>/dev/null || stat -c %Y "$IDX/repos/$ID13.md")"
+cp "$IDX/repos/$ID13.md" "$WORK/blk1"; CLAUDE_PROJECT_DIR="$O" "$O/.claude/hooks/ledger-rollup.sh"
+check "unchanged block is not rewritten (only the stamp would move)" "cmp -s '$WORK/blk1' '$IDX/repos/$ID13.md'"
+check "hash ids are never read as legacy ids" "python3 -c \"import sys; sys.path.insert(0,'$SKILL/templates/hooks'); from _ledger_parse import ID_RE; assert ID_RE.findall('Closes: F-020200f, D-014') == ['F-020200f','D-014'], ID_RE.findall('Closes: F-020200f, D-014')\""
+
+# ---------------------------------------------------------------------------
+echo "13c. tidy: due by volume of work and time, reset by a Tidy: commit"
+T="$(newrepo tidy)"
+GIT_AUTHOR_DATE="2026-01-01T10:00:00" GIT_COMMITTER_DATE="2026-01-01T10:00:00" installed "$T"
+TS() { CLAUDE_PROJECT_DIR="$T" python3 "$T/.claude/hooks/_ledger_parse.py" tidy-status "$T/LEDGER.md" "$T"; }
+for i in 1 2 3 4 5; do commit "$T" "f$i
+
+Decision: small decision number $i"; done
+sync_ "$T"
+check "a little work: not due" "[ -z \"\$(TS)\" ]"
+for i in $(seq 1 26); do commit "$T" "g$i
+
+Finding: measured fact number $i about the thing"; done
+sync_ "$T"
+check "enough work over enough time: due, with the reason" "TS | grep -q 'new entries' && TS | grep -q 'never tidied'"
+check "the digest offers /ledger-tidy" "digest '$T' | grep -q 'Tidy due:.*ledger-tidy'"
+CLAUDE_PROJECT_DIR="$T" "$T/.claude/hooks/ledger-rollup.sh"
+check "the dashboard flags it" "grep -q 'tidy due' \"$IDX/repos/\$(sed -n 's/^REPO_ID=//p' '$T/.claude/ledger.conf').md\""
+hc "$T" -m "chore(ledger): tidy" -m "Tidy: nothing to fold"
+check "a Tidy: commit resets it" "[ -z \"\$(TS)\" ]"
+B2="$(newrepo burst)"; installed "$B2"
+for i in $(seq 1 80); do commit "$B2" "b$i
+
+Decision: burst decision number $i of many"; done
+sync_ "$B2"
+check "a one-day burst is due regardless of time" "CLAUDE_PROJECT_DIR='$B2' python3 '$B2/.claude/hooks/_ledger_parse.py' tidy-status '$B2/LEDGER.md' '$B2' | grep -q 'over 0 days'"
+commit "$T" "x
+
+Opens: the cache is invalidated on every deploy now
+Decision: bust the cache on every deploy
+Opens: C-021"
+commit "$T" "y
+
+Decision: bust the whole cache on every single deploy"
+sync_ "$T"
+REP="$(CLAUDE_PROJECT_DIR="$T" python3 "$T/.claude/hooks/_ledger_parse.py" tidy-report "$T/LEDGER.md" "$T")"
+check "report: an open item opened with its decision" "printf '%s' \"\$REP\" | grep -q 'opened in the same commit as'"
+check "report: near-duplicate decisions"             "printf '%s' \"\$REP\" | grep -q \"$(hid D 'bust the cache on every deploy') ≈\\|≈ $(hid D 'bust the cache on every deploy')\""
+check "report: id-only junk"                         "printf '%s' \"\$REP\" | grep -A3 'Empty or id-only' | grep -q 'C-021'"
 
 # ---------------------------------------------------------------------------
 echo "14. the user-level session hook"

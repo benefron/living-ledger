@@ -131,6 +131,12 @@ fi
 # --- stale path-scoped rules ------------------------------------------------
 # A rule in .claude/rules/ exists to stop ONE open finding being re-derived. When that
 # finding is CLOSED or SUPERSEDED the rule is now misinforming future sessions.
+# --- is a tidy due? (volume of work + time since the last `Tidy:` commit) --------
+TIDY="$(PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/_ledger_parse.py" tidy-status "$VIEW" "$REPO" "$MAX_OPEN" 2>/dev/null || true)"
+[ -n "$TIDY" ] && NOTES="$NOTES
+- Tidy due: $TIDY. Offer \`/ledger-tidy\` once, at a natural pause — not mid-task (it triages \
+open items, folds duplicates, fixes stale rules; ~10 minutes of the user's review)."
+
 STALE="$(PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/_ledger_parse.py" stale-rules "$VIEW" "$REPO/.claude/rules" 2>/dev/null || true)"
 rm -f "$VIEW"
 if [ -n "$STALE" ]; then

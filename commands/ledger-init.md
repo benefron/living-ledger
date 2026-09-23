@@ -19,22 +19,21 @@ first commit* — the commit is the capture mechanism.
    `chore: upgrade living ledger to template vN` commit (`Ledger: none`). It never rewrites or
    renumbers entries, keeps hand-set `ledger.conf` keys, and moves a v3 `core.hooksPath` setup to
    per-clone hook shims (so Git LFS & co. run again).
-2. **From v1–v3, triage the Open list once.** Before v4, every `Finding:` was created OPEN, so the
-   open list is full of settled facts. For each OPEN `F-` entry: fixed → change `OPEN` to `CLOSED`
-   in its header; a settled fact or result → `STANDING`; still a real problem → leave it. Show the
-   user the proposed changes as a table, apply what they approve, commit with
-   `Ledger: none — triage of legacy open findings after the v4 upgrade`.
+2. **From v1–v3, offer a first `/ledger-tidy`.** Before v4, every `Finding:` was created OPEN, so
+   the open list is full of settled facts, and nothing was ever folded; a never-tidied ledger
+   shows as due right away. The tidy report lists exactly what to review.
 3. **Offer recovery of dropped trailers** if the repo was on v1–v3: the old parser silently
    dropped any trailer paragraph with a wrapped line. Measure it without touching the repo:
    ```bash
    V="$(mktemp)"; cp <ledger> "$V"
-   sed -i.bak "s/^SYNC_FROM=.*/SYNC_FROM=<first commit that touched the ledger>/" .claude/ledger.conf
-   LL_LEDGER_FILE="$V" LL_DECISIONS_FILE= .claude/hooks/ledger-sync.sh; mv .claude/ledger.conf.bak .claude/ledger.conf
+   FIRST="$(git log --reverse --format=%h -- <ledger> | head -1)"
+   LL_SYNC_FROM="$FIRST" LL_LEDGER_FILE="$V" LL_DECISIONS_FILE= .claude/hooks/ledger-sync.sh
    diff <(grep '^## ' <ledger>) <(grep '^## ' "$V")
    ```
    If the user wants them, re-run `install.sh "<repo>" --upgrade --seed <that commit>`: the floor
-   moves back and the next sync records them with their original commit dates (dedup keeps
-   existing entries single). Point out any that restate an entry recorded later.
+   moves back and the sync records them at their original dates, in date order (dedup keeps
+   existing entries single). Point out any that restate an entry recorded later — the next tidy
+   folds them.
 
 ## Fresh install
 
