@@ -55,7 +55,7 @@ the queue has no back-pressure yet
 Requires git, python3 (3.8+), bash, and [Claude Code](https://code.claude.com).
 
 ```bash
-git clone https://github.com/<you>/living-ledger ~/.claude/skills/living-ledger
+git clone https://github.com/benefron/living-ledger ~/.claude/skills/living-ledger
 ~/.claude/skills/living-ledger/install.sh --global-only
 ```
 
