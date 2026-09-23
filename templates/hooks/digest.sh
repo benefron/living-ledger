@@ -131,6 +131,10 @@ fi
 # --- stale path-scoped rules ------------------------------------------------
 # A rule in .claude/rules/ exists to stop ONE open finding being re-derived. When that
 # finding is CLOSED or SUPERSEDED the rule is now misinforming future sessions.
+# --- path-scoped rules from Directive:/Constraint:/Rejected: trailers (regenerated) ----
+# Each loads when Claude reads a file that commit touched: the constraint harvest, before edits.
+"$HERE/ledger" rules >/dev/null 2>&1 || true
+
 # --- ledger records that exist somewhere this checkout has not shared or seen -----
 # local refs only (no network): unpushed, not pulled as of the last fetch, other branches and
 # worktrees, and — from the private index — other machines' unpushed records for this repo

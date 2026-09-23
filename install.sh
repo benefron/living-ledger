@@ -297,6 +297,7 @@ print(",".join(sorted(p for p, n in c.items() if n >= 3)))
   install -m 0644 "$TPL/hooks/_ledger_parse.py" "$repo/.claude/hooks/_ledger_parse.py"
   install -m 0755 "$TPL/hooks/ledger-merge.py"  "$repo/.claude/hooks/ledger-merge.py"
   install -m 0755 "$TPL/hooks/ledger-activate.sh" "$repo/.claude/hooks/ledger-activate.sh"
+  install -m 0755 "$TPL/hooks/ledger"             "$repo/.claude/hooks/ledger"
   install -m 0644 "$SKILL_DIR/lib/common.sh"    "$repo/.claude/hooks/_ledger_lib.sh"
   say "· hooks       -> .claude/hooks/ (digest, ledger-sync, ledger-rollup, index-push, merge driver, lib, parser)"
 
@@ -357,6 +358,7 @@ print(",".join(sorted(p for p, n in c.items() if n >= 3)))
   touch "$gi"
   grep -qx '.ledger-nudged'  "$gi" || echo '.ledger-nudged'  >> "$gi"
   grep -qx 'hooks/__pycache__/' "$gi" || echo 'hooks/__pycache__/' >> "$gi"
+  grep -qx 'rules/ledger/' "$gi" || echo 'rules/ledger/' >> "$gi"     # generated each session
   if [ -f "$repo/.claude/.ledger-sync" ]; then
     rm -f "$repo/.claude/.ledger-sync"
     say "· sync state  -> per-machine bookmark retired (SYNC_FROM=$seed is committed instead)"
@@ -425,10 +427,9 @@ print(",".join(sorted(p for p, n in c.items() if n >= 3)))
   fi
 
   say ""
-  say "  Done. Every commit from here needs a ledger trailer in its trailing block:"
-  say "    Decision: / Finding: / Opens: / Closes: F-x / Retires: / Supersedes: D-x / Refs: F-x"
-  say "  or the explicit opt-out  'Ledger: none — <reason>'.  Escape hatch: --no-verify."
-  say "  .githooks/commit-msg enforces it; .githooks/post-commit syncs + commits the ledger."
+  say "  Done. From here on Claude records decisions, findings and to-dos on the commits it makes,"
+  say "  and every session starts with the ledger's digest. If you commit by hand, end the message"
+  say "  with one line such as 'Decision: …' — or 'Ledger: none — <why>' — the commit hook reminds you."
 }
 
 # --- dispatch --------------------------------------------------------

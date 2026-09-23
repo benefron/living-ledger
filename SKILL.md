@@ -32,6 +32,13 @@ institutional knowledge"*, carried in native git trailers because a commit and i
 *"cannot drift out of sync"*. See `reference/lore-paper.md`. The ledger adds a materialised,
 greppable read surface (`LEDGER.md`) and a session digest on top; git stays the source of truth.
 
+## The principle: the user barely notices
+
+The user should not have to learn any of this. **You** pick the trailers, write them, keep the
+ledger current and suggest the tidy; the user approves one-line records and otherwise works as
+usual. Propose records at natural pauses — batched, one line each — not in the middle of their
+flow, and never lecture them on the vocabulary.
+
 ## The trailer vocabulary
 
 In the **last paragraph** of a commit message, one per line (a long one may wrap):
@@ -88,11 +95,24 @@ cited freely.
      ```
    The post-commit hook writes the entry and commits the ledger by itself. Never hand-write a
    trailer-born entry into `LEDGER.md`.
-4. For a decision, put the **why** in the commit body (that is Lore's level 2). Write a section
+4. **Name what you rejected, and warn the next person.** A `Decision:` that had a serious
+   alternative gets `Rejected: <alternative> | <why it lost>` directly under it; code that is
+   deliberately unusual gets `Directive: <what not to change, and why>`. They are not decoration:
+   they become path rules Claude sees when it opens those files, `ledger context` shows them,
+   and the gate refuses a later decision that re-adopts a rejected alternative.
+5. For a decision, put the **why** in the commit body (that is Lore's level 2). Write a section
    in `DECISIONS.md` too when the reasoning is bigger than a commit body: what was decided
    (quoting the ledger line), why, what was rejected, where it lives, what is still unvalidated.
    Append-only; a replaced section gains `**Superseded by:**`, never an edit.
-5. A recurring `Directive:` about one area → propose a `.claude/rules/*.md` path-scoped rule.
+6. A directive that should outlive any one commit, or spans many files → propose a hand-written
+   `.claude/rules/*.md` rule (the generated ones in `.claude/rules/ledger/` follow commits).
+
+### Before changing code in an area you have not worked in this session
+
+`.claude/hooks/ledger context <path>` — the directives, constraints, rejected alternatives and
+entries recorded for it. (Claude also gets the generated rules for a file when it opens it.)
+After pulling work made elsewhere, `.claude/hooks/ledger validate` shows commits that skipped
+the ledger's rules.
 
 ### "note that …" / "remember that …"
 

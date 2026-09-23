@@ -63,6 +63,10 @@ first commit* — the commit is the capture mechanism.
 9. **Backfill** (unless none): propose entries in the `recording: …` form; approved ones go under
    `<!-- ENTRIES_START -->` with `(backfilled)` / `(from <sha>)` dates — never bare — and evidence
    pointing at tracked files. Commit: `docs: backfill the living ledger`, `Ledger: none — backfill`.
-10. **Tell the user how commits work now**, in three lines: every commit carries a trailer in its
-    last paragraph (the table in the skill); `Ledger: none — <reason>` is the opt-out and
-    `--no-verify` the escape hatch; the ledger syncs and commits itself after every commit.
+10. **Other agents.** If the repo has an `AGENTS.md` (Codex, Cursor, Copilot…), offer to append
+    `templates/AGENTS.snippet.md` from the skill to it, so they use the same ledger.
+11. **Tell the user what changes for them — very little**, in two or three plain lines: you will
+    propose one-line records as decisions and findings come up, and write them into your commits;
+    every session starts with the digest; if they commit by hand, they end the message with a line
+    like `Decision: …` or `Ledger: none — <why>`, and the hook reminds them. Do not recite the
+    vocabulary — it is yours to use, not theirs to learn.

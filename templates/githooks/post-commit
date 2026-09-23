@@ -90,7 +90,10 @@ if [ -n "$(dirty)" ]; then
   fi
 fi
 
-# 6. keep the cross-repo mirror warm -----------------------------------------
+# 6. a new Directive:/Constraint:/Rejected: becomes a path-scoped rule right away
+[ -x "$ROOT/.claude/hooks/ledger" ] && "$ROOT/.claude/hooks/ledger" rules >/dev/null 2>&1
+
+# 7. keep the cross-repo mirror warm -----------------------------------------
 [ -x "$ROOT/.claude/hooks/ledger-rollup.sh" ] && \
   LEDGER_SYNC_IN_PROGRESS=1 "$ROOT/.claude/hooks/ledger-rollup.sh" >/dev/null 2>&1
 

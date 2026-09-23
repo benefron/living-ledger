@@ -1,19 +1,64 @@
 # living-ledger
 
-**Project memory for Claude Code that lives in git.** Every decision, finding, open question,
-action and dead end is recorded as a trailer on the commit that made it, collected into a
-greppable `LEDGER.md`, and handed to every new session as a short digest — so a cold session
-starts from what was already settled instead of re-deriving it, and nobody hears *"we had this
-discussion before"* again.
+[![test](https://github.com/benefron/living-ledger/actions/workflows/test.yml/badge.svg)](https://github.com/benefron/living-ledger/actions/workflows/test.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-It works for code, and for the parts of a project that are not code: direction, scope,
-priorities, a call made in a meeting, a deadline you are waiting on. Those are commits too — empty
-ones — so they are dated, attributed, merged across branches and machines, and never out of sync
-with the history that enacted them.
+**Project memory for Claude Code that lives in git.** Decisions, findings, open questions, to-dos
+and dead ends are recorded as you work — by Claude, on the commits it makes — and every new session
+starts from what was already settled instead of re-deriving it. No more *"we had this discussion
+before"*. It works for the parts of a project that are not code, too: direction, scope,
+priorities, a call made in a meeting, a deadline you are waiting on.
 
-It implements the **Lore** pattern — git commit trailers as a structured knowledge protocol for
-AI coding agents (Stetsenko, [arXiv:2603.15566](https://arxiv.org/abs/2603.15566), 2026) — and
-adds a materialised read surface, a session digest and a cross-repo dashboard on top.
+Built on the **Lore** protocol — git commit trailers as a knowledge channel for AI coding agents
+(Stetsenko, [arXiv:2603.15566](https://arxiv.org/abs/2603.15566)).
+
+## How you work with it
+
+**You work as usual. Claude keeps the ledger.**
+
+1. **You talk.** When a decision, a finding, a dead end or a to-do comes up, Claude proposes a
+   one-line record — *"recording: Decision: use a queue instead of a lock"* — and you say yes,
+   edit it, or no.
+2. **Claude records it** on the commit it is making (or on an empty commit, if there is nothing
+   else to commit). A git hook turns that into a ledger entry and commits the ledger. You never
+   edit `LEDGER.md`.
+3. **Every session starts informed.** Claude gets a short digest — what is open, what is overdue,
+   what is decided, what was ruled out — and, when it opens a file, what the history says about it.
+4. **Now and then Claude suggests a tidy**: a short review of the ledger, approved by you item by
+   item.
+
+That is the whole workflow. Everything under [Reference](#reference) is for the curious.
+
+**If you commit by hand** (terminal, IDE), end the message with one line such as
+`Decision: …` or `Finding: …` — or `Ledger: none — <why>` for a change that records nothing. The
+commit hook tells you if it is missing. **Optional commands:** `/ledger-status` (every repo at a
+glance), `/ledger-note` (record something right now), `/ledger-tidy`.
+
+## Install
+
+Requires git, python3 (3.8+), bash and [Claude Code](https://code.claude.com); macOS and Linux
+(CI runs both — Windows is untested, WSL should behave like Linux).
+
+```bash
+git clone https://github.com/benefron/living-ledger ~/.claude/skills/living-ledger
+~/.claude/skills/living-ledger/install.sh --global-only
+```
+
+Then, in a repository — ideally before its first commit — run `/ledger-init` in Claude Code and
+commit what it creates. Collaborators get the ledger with the repo; there is nothing else for
+them to install.
+
+- **Updating:** `git -C ~/.claude/skills/living-ledger pull`. Each repo then offers the upgrade at
+  its next session (`LEDGER UPGRADE AVAILABLE`) — one commit, nothing renumbered.
+- **Several machines:** run `/ledger-setup` once per machine to back your cross-repo dashboard with
+  a private git repo of your own. The ledgers themselves always live in their repos.
+- `--global-only` installs the `/ledger-*` commands, a local cross-repo index at
+  `~/.claude/ledger/`, and one user-level session hook that suggests `/ledger-init` once in a repo
+  without a ledger (`LL_NO_GLOBAL_HOOK=1` skips it).
+
+## What it looks like
+
+Under the hood, a commit Claude makes carries its records as git trailers in the last paragraph:
 
 ```text
 $ git commit -m "feat: stream frames through a bounded queue" -m "Profiling showed 70% of
@@ -37,7 +82,7 @@ the queue has no back-pressure yet
 → commit 744a3d8
 ```
 
-…and the next session opens with:
+The next session opens with:
 
 ```text
 # Project ledger digest (auto-injected; full file: ~/code/app/docs/LEDGER.md)
@@ -50,33 +95,9 @@ the queue has no back-pressure yet
 - R-0c4f7a1 "a nightly batch job is good enough"
 ```
 
-## Install
+---
 
-Requires git, python3 (3.8+), bash, and [Claude Code](https://code.claude.com).
-
-```bash
-git clone https://github.com/benefron/living-ledger ~/.claude/skills/living-ledger
-~/.claude/skills/living-ledger/install.sh --global-only
-```
-
-`--global-only` installs the `/ledger-init`, `/ledger-status`, `/ledger-note`, `/ledger-tidy`
-and `/ledger-setup` commands, creates your local cross-repo index at `~/.claude/ledger/`, and adds one
-user-level `SessionStart` hook (it suggests `/ledger-init` once in a repo without a ledger, and
-flags repos running an older template; `LL_NO_GLOBAL_HOOK=1` skips it).
-
-Then, in a repository — ideally before its first commit:
-
-```text
-/ledger-init
-```
-
-(or `~/.claude/skills/living-ledger/install.sh /path/to/repo`). Commit what it created. Every
-clone of that repo now carries the ledger, its hooks and its history; there is nothing else to
-install for collaborators beyond Claude Code itself.
-
-**Working across machines?** Run `/ledger-setup` once per machine to back `~/.claude/ledger/` with
-a private git repo of your own. It holds only your dashboard (which repos, what is open in each);
-the ledgers themselves always live in their repos.
+# Reference
 
 ## The vocabulary
 
@@ -114,9 +135,6 @@ the commit says how they relate (`Refs:` if it enacts it, `Supersedes:` if it re
 `Refs:` beside the new entry if it is genuinely different). Content-hash ids already merge exact
 repeats; this catches the rewordings.
 
-Claude does all of this for you: the skill fires when a decision, finding or dead end comes up in
-conversation, proposes the one-line record, and commits it when you approve.
-
 ## How it works
 
 ```text
@@ -142,6 +160,28 @@ conversation, proposes the one-line record, and commits it when you approve.
   post-commit hook writes the ledger, and it commits what it writes.
 - **Level 2 is the commit body.** The *why* of a decision lives in the message that carried it;
   `DECISIONS.md` holds longer reasoning, append-only. See the three-levels table in the template.
+
+## Built on Lore — and usable by any agent
+
+The trailer format follows the **Lore** protocol ([arXiv:2603.15566](https://arxiv.org/abs/2603.15566)):
+`Constraint:`, `Rejected: <alt> | <why>`, `Directive:`, `Confidence:`, `Reversibility:`,
+`Scope-risk:`, `Tested:`, `Not-tested:`, `Related:` are recorded as-is, so a living-ledger repo is
+a valid Lore repo. Those trailers are also put to work:
+
+- `ledger context <path>` (and `directives`, `constraints`, `rejected`) — what history says
+  about a file before you change it: the paper's *constraint harvest*, for any agent or person.
+- **Generated path rules** — each commit's `Directive:`/`Constraint:`/`Rejected:` becomes a
+  Claude Code rule scoped to the files that commit touched, so Claude sees it when it opens them.
+- **Anti-pattern filtering, enforced** — a new `Decision:` that re-adopts a rejected alternative
+  or a retired approach is refused unless the commit supersedes it on purpose.
+- `ledger stale` (directives whose code changed a lot since), `ledger validate` (history made
+  without the hooks), and tags for `Confidence: low` / `Reversibility: irreversible` decisions.
+
+The git hooks and the `ledger` command (`.claude/hooks/ledger help`) need nothing but git,
+bash and Python, so Codex, Cursor, Copilot or a person at a terminal can use the same ledger.
+Paste [`templates/AGENTS.snippet.md`](templates/AGENTS.snippet.md) into the repo's `AGENTS.md`
+to tell other agents it is there. How this compares with the paper, point by point:
+[`reference/lore-paper.md`](reference/lore-paper.md).
 
 ## Keeping it true: `/ledger-tidy`
 
@@ -174,6 +214,7 @@ Everything is local shell + python, readable in `templates/`. Nothing phones hom
 | `.claude/hooks/digest.sh` | Claude Code session start / after compaction | reads the repo; activates the git hooks on a fresh clone (announced); updates your local index |
 | `.claude/hooks/ledger-index-push.sh` | session start (async) / session end | commits + pushes `~/.claude/ledger` **only if you gave it a remote** |
 | `bin/ledger-session.sh` | session start, user-level | reads only; prints a one-line suggestion |
+| `.claude/hooks/ledger` | when you or an agent run it | reads only — except `ledger rules`, which rewrites `.claude/rules/ledger/` (gitignored; also run at session start and after each commit) |
 
 **Branches, worktrees and machines.** At session start the digest also says where ledger records
 exist that this checkout has not shared or seen — unpushed here, on the upstream but not pulled
@@ -232,6 +273,8 @@ gitignored, `core.hooksPath` silently disabling Git LFS, and the digest leaking 
 pipeline calls. See [`CHANGELOG.md`](CHANGELOG.md) and this repo's own [`LEDGER.md`](LEDGER.md).
 
 ## Development
+
+Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ```bash
 bash tests/run_tests.sh      # end-to-end: install, gate, sync, merge, upgrade, digest, index

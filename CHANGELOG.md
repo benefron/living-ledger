@@ -92,6 +92,24 @@ not rewritten just to move its timestamp; hash ids are never read as legacy ids 
 - Each machine writes `hosts/<machine>.tsv` into the private index (single writer, no merge
   conflicts); `/ledger-status` lists every machine's unshared records.
 
+**The Lore query side** (arXiv:2603.15566), put to work
+- `.claude/hooks/ledger`: `context|directives|constraints|rejected <path>`, `open`, `decisions`,
+  `retired`, `stale`, `validate`, `rules`, `tidy`, `share` — for any agent or person.
+- Each commit's `Directive:`/`Constraint:`/`Rejected:` becomes a Claude Code path-scoped rule in
+  `.claude/rules/ledger/` (gitignored, regenerated at session start and after each commit);
+  a superseded decision's rule is withdrawn.
+- The gate refuses a `Decision:` that re-adopts a rejected alternative or a retired framing
+  unless the commit supersedes it; `Confidence: low` / `Reversibility: irreversible` are tagged in
+  the digest; the tidy report lists stale directives and old low-confidence decisions.
+- `templates/AGENTS.snippet.md` for other agents; `reference/lore-paper.md` compares point by point.
+
+**Docs and packaging**
+- The README leads with the workflow you actually see — Claude proposes one-line records and
+  writes them into its commits; you approve — and keeps the vocabulary and internals as reference.
+  The installer and `/ledger-init` say the same in two lines instead of reciting the vocabulary.
+- CI badge, platform note, updating steps, `CONTRIBUTING.md`, a bug-report template, and
+  `demo/` (a scripted walkthrough, and a `vhs` tape that records it).
+
 **Upgrade** commits with `Ledger: none` (a template bump is not a project decision) and derives
 pending trailers into the same single commit.
 

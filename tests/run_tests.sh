@@ -564,6 +564,43 @@ check "the dashboard lists it per machine" "'$SKILL/bin/ledger-status.sh' --no-g
 unset LEDGER_HOST
 
 # ---------------------------------------------------------------------------
+echo "13g. the Lore query side: context, generated rules, stale, validate, anti-patterns"
+LQ="$(newrepo lore)"; installed "$LQ"
+mkdir -p "$LQ/src"; echo a > "$LQ/src/auth.py"; git -C "$LQ" add -A
+hc "$LQ" -m "feat: token refresh" -m "Decision: refresh expired tokens inline in the request interceptor
+Constraint: the auth service does not support token introspection
+Rejected: extend the token lifetime to a full day of validity | security policy violation
+Directive: error handling is intentionally broad; do not narrow it without checking upstream
+Confidence: low"
+L1() { ( cd "$LQ" && .claude/hooks/ledger "$@" ); }
+check "context <path> harvests directive, constraint, rejected" "L1 context src/auth.py > '$WORK/ctx'; grep -q 'intentionally broad' '$WORK/ctx' && grep -q 'token introspection' '$WORK/ctx' && grep -q 'full day of validity' '$WORK/ctx'"
+check "…and the entries those commits made"    "grep -q \"$(hid D 'refresh expired tokens inline in the request interceptor')\" '$WORK/ctx'"
+check "directives <path> shows only directives" "L1 directives src/auth.py | grep -q 'intentionally broad' && ! L1 directives src/auth.py | grep -q 'introspection'"
+RF="$(ls "$LQ/.claude/rules/ledger/"*.md 2>/dev/null | head -1)"
+check "post-commit generated a path-scoped rule"  "[ -n '$RF' ] && grep -q '\"src/auth.py\"' '$RF' && grep -q 'Directive:' '$RF'"
+check "…in a gitignored directory"                "git -C '$LQ' check-ignore -q '$RF'"
+hc "$LQ" -m "decide: no code" -m "Decision: the audit log is kept for two years
+Directive: never shorten the retention without legal sign-off"
+check "a record with no files makes no rule"      "[ \$(ls '$LQ/.claude/rules/ledger/' | wc -l) -eq 1 ]"
+check "the digest tags a low-confidence decision" "digest '$LQ' | grep -q 'low confidence'"
+hc "$LQ" -m "x" -m "Decision: extend the token lifetime to a full day of validity for everyone"
+check "the gate stops re-adopting a rejected alternative" "grep -q 're-adopts what' '$WORK/err' && grep -q 'rejected' '$WORK/err'"
+hc "$LQ" -m "x" -m "Retires: a nightly batch job is good enough for the export pipeline"
+hc "$LQ" -m "x" -m "Decision: run a nightly batch job for the export pipeline, good enough for now"
+check "the gate stops re-adopting a retired framing" "grep -q 'retired' '$WORK/err'"
+hc "$LQ" -m "x" -m "Decision: run a nightly batch job for the export pipeline, good enough for now
+Supersedes: $(hid R 'a nightly batch job is good enough for the export pipeline')"
+check "…unless the commit supersedes it on purpose" "[ \$? -eq 0 ]"
+for i in 1 2 3; do echo "$i" >> "$LQ/src/auth.py"; git -C "$LQ" add -A; hc "$LQ" -m "tweak $i" -m "Ledger: none — trivial change to the auth file"; done
+check "stale: a directive whose file changed since" "L1 stale 3 | grep -q 'intentionally broad'"
+git -C "$LQ" -c core.hooksPath="$NOHOOKS" commit -q --allow-empty -m "wip without a trailer"
+check "validate finds history made without the hooks" "L1 validate 3 | grep -q '1 of the last 3 commits'"
+hc "$LQ" -m "retire" -m "Decision: tokens are refreshed by a dedicated background service
+Supersedes: $(hid D 'refresh expired tokens inline in the request interceptor')"
+L1 rules >/dev/null
+check "a superseded decision's rule is withdrawn" "[ -z \"\$(ls '$LQ/.claude/rules/ledger/' 2>/dev/null)\" ]"
+
+# ---------------------------------------------------------------------------
 echo "14. the user-level session hook"
 SESS="$SKILL/bin/ledger-session.sh"
 NL="$(newrepo noledger)"
