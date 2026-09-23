@@ -514,6 +514,12 @@ def _conf(root, key):
     return ''
 
 
+def external_prefixes(root):
+    """Id prefixes that belong to ANOTHER register (EXTERNAL_IDS=C in ledger.conf, e.g. a
+    CONCERNS.md numbered C-001…): trailers may cite them, the ledger never owns them."""
+    return {p for p in re.split(r'[\s,]+', _conf(root, 'EXTERNAL_IDS').strip('"\'')) if p}
+
+
 def _ledger_path(root):
     rel = _conf(root, 'LEDGER_PATH')
     if rel:
@@ -591,14 +597,18 @@ def check_msg(msgfile, root):
     except Exception:
         known = set()
     declared = {m.group(1) for l in tl for m in [re.match(r'^Opens:\s+(F-\S+)\s+\S', l)] if m}
+    ext = external_prefixes(root)
     related = entries = False
     for line in tl:
         key, _, val = line.partition(':')
         val = val.strip()
         if key in KINDS:
+            lead = ID_LED.match(val)
             if key == 'Opens' and re.match(r'^F-(?:[0-9a-f]{7}|\d{3,6})\s+\S', val):
                 entries = True
-            elif ID_LED.match(val):
+            elif lead and lead.group(0).split('-')[0] in ext and len(val[lead.end():].split()) >= 3:
+                entries = True        # "Opens: C-032 -- <words>": cites the other register, has content
+            elif lead:
                 problems.append(f"`{key}: {val[:50]}` starts with an id. To relate this commit to an "
                                 f"existing entry use `Refs: <id>` (or `Closes:`); `{key}:` records a "
                                 f"new statement in words.")
@@ -611,6 +621,8 @@ def check_msg(msgfile, root):
             if not ids:
                 problems.append(f"`{key}: {val[:40]}` names no entry id (ids look like F-3fa9c1e or F-014).")
             for i in ids:
+                if i.split('-')[0] in ext:
+                    continue              # an id of the other register: not the ledger's to check
                 if ledger and os.path.exists(ledger) and i not in known and i not in declared:
                     problems.append(f"`{key}: {i}` — there is no entry {i} in "
                                     f"{os.path.relpath(ledger, root)}. (On another branch? Merge it "

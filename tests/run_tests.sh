@@ -400,12 +400,12 @@ PUSH="$SKILL/templates/hooks/ledger-index-push.sh"
 printf '## machine-2 block\n_rebuilt 2030-01-01T00:00:00Z_\n' > "$M2/repos/$DID.md"
 printf 'other-repo\t-\tLEDGER.md\t2026-01-01\n' >> "$M2/registry.tsv"
 LEDGER_HOME="$M2" "$PUSH"
-CLAUDE_PROJECT_DIR="$D" "$D/.claude/hooks/ledger-rollup.sh"
+printf 'machine-1-repo\t-\tLEDGER.md\t2026-01-02\n' >> "$IDX/registry.tsv"   # this machine changed too
 "$PUSH" > "$WORK/push.out"
 check "second machine's push is not rejected" "[ \"\$(git -C '$IDX' rev-parse HEAD)\" = \"\$(git -C '$BARE' rev-parse main)\" ]"
-check "registry rows from both machines kept"  "grep -q '^other-repo' '$IDX/registry.tsv' && grep -q \"^$DID\" '$IDX/registry.tsv'"
+check "registry rows from both machines kept"  "grep -q '^other-repo' '$IDX/registry.tsv' && grep -q '^machine-1-repo' '$IDX/registry.tsv'"
 check "newest block stamp won"                 "grep -q 'machine-2 block' '$IDX/repos/$DID.md'"
-git -C "$IDX" remote set-url origin "$WORK/nowhere.git"; CLAUDE_PROJECT_DIR="$P" "$P/.claude/hooks/ledger-rollup.sh"
+git -C "$IDX" remote set-url origin "$WORK/nowhere.git"; printf 'offline-repo\t-\tLEDGER.md\t2026-01-03\n' >> "$IDX/registry.tsv"
 OUT="$("$PUSH" --timeout 2)"
 check "unreachable remote: one line, no failure" "[ \$(printf '%s' \"\$OUT\" | grep -c 'unpushed') -eq 1 ]"
 
@@ -470,6 +470,36 @@ REP="$(CLAUDE_PROJECT_DIR="$T" python3 "$T/.claude/hooks/_ledger_parse.py" tidy-
 check "report: an open item opened with its decision" "printf '%s' \"\$REP\" | grep -q 'opened in the same commit as'"
 check "report: near-duplicate decisions"             "printf '%s' \"\$REP\" | grep -q \"$(hid D 'bust the cache on every deploy') ≈\\|≈ $(hid D 'bust the cache on every deploy')\""
 check "report: id-only junk"                         "printf '%s' \"\$REP\" | grep -A3 'Empty or id-only' | grep -q 'C-021'"
+
+# ---------------------------------------------------------------------------
+echo "13d. worktrees, merges, and ids of another register"
+WT="$(newrepo wtmain)"; installed "$WT"
+git -C "$WT" worktree add -q -b feat-wt "$WORK/wt-side" 2>/dev/null
+( cd "$WORK/wt-side" && CLAUDE_PROJECT_DIR="$WT" git commit -q --allow-empty -m "x" -m "Decision: made in a worktree while the session points at main" ) >/dev/null 2>&1
+check "a worktree commit syncs the WORKTREE's ledger" "grep -q 'made in a worktree' '$WORK/wt-side/LEDGER.md' && ! grep -q 'made in a worktree' '$WT/LEDGER.md'"
+check "…and main's tree is untouched" "[ -z \"\$(git -C '$WT' status --porcelain)\" ]"
+git -C "$WT" checkout -q -b side2; commit "$WT" "y
+
+Decision: arrived on a branch whose hooks did not run"; git -C "$WT" checkout -q main
+( cd "$WT" && git merge --no-ff --no-edit side2 ) > "$WORK/merge.out" 2>&1
+check "post-merge says what the merge brought in" "grep -q 'this merge brought 1 ledger entry' '$WORK/merge.out' && [ -z \"\$(git -C '$WT' status --porcelain)\" ]"
+hc "$WT" -m "chore: record merged ledger entries" -m "Ledger: none — recording entries a merge brought in"
+check "…and the next commit records it" "grep -q 'arrived on a branch whose hooks' '$WT/LEDGER.md'"
+X="$(newrepo extids)"
+for i in 1 2 3; do commit "$X" "c$i
+
+Refs: C-01$i"; done
+installed "$X"
+check "install detects another register's ids" "grep -qx 'EXTERNAL_IDS=C' '$X/.claude/ledger.conf'"
+hc "$X" -m "fix" -m "Opens: C-032 -- the gain target disagrees with the simulator by 149x
+Refs: C-022, C-026"
+check "Opens: C-… <words> and Refs: C-… pass the gate" "grep -q '^C-032 -- the gain target disagrees' '$X/LEDGER.md'"
+check "…and the other register's ids ride along as a pointer" "grep -q '^· Refs: C-022, C-026' '$X/LEDGER.md'"
+hc "$X" -m "x" -m "Opens: C-021"
+check "an id-only entry is still rejected" "grep -q 'starts with an id' '$WORK/err'"
+sed -i.bak '/^EXTERNAL_IDS=/d' "$X/.claude/ledger.conf"; rm -f "$X/.claude/ledger.conf.bak"
+hc "$X" -m "x" -m "Refs: C-022"
+check "without EXTERNAL_IDS, an unknown id is rejected" "grep -q 'no entry C-022' '$WORK/err'"
 
 # ---------------------------------------------------------------------------
 echo "14. the user-level session hook"

@@ -243,6 +243,29 @@ if auto:
     fi
   fi
 
+  # 1c. ids of another register: trailers that keep citing e.g. C-012 from a CONCERNS.md
+  #     (>= 3 times in the last 300 commits, a prefix the ledger never uses) are that register's
+  #     — the gate must not reject them as unknown ledger ids.
+  if ! grep -q '^EXTERNAL_IDS=' "$conf"; then
+    local ext
+    ext="$(git -C "$repo" log -n300 --format='%B%x1e' 2>/dev/null | python3 -c '
+import re, sys, collections
+c = collections.Counter()
+for rec in sys.stdin.read().split("\x1e"):
+    for line in rec.splitlines():
+        m = re.match(r"^(Refs|Closes|Opens|Supersedes|Finding|Decision|Fixed):\s*(.*)$", line.strip())
+        if m:
+            for p in re.findall(r"\b([A-Z])-\d{3}\b", m.group(2)):
+                if p not in "DFARN":
+                    c[p] += 1
+print(",".join(sorted(p for p, n in c.items() if n >= 3)))
+' 2>/dev/null || true)"
+    if [ -n "$ext" ]; then
+      printf '\n# Id prefixes of ANOTHER register (detected at install: trailers cite them often).\n# The gate accepts them in Refs:/Closes:/Opens: without a ledger entry; the sync records them\n# as a pointer on the entry. Comma-separated single letters.\nEXTERNAL_IDS=%s\n' "$ext" >> "$conf"
+      warn "· trailers cite another register's ids ($ext-…): EXTERNAL_IDS=$ext in .claude/ledger.conf"
+    fi
+  fi
+
   # 2. LEDGER.md (create only; entries are NEVER rewritten). On an upgrade the only
   #    thing touched is the header: standard paragraphs that are missing get added.
   if [ -f "$ledger_abs" ]; then
@@ -293,6 +316,7 @@ if auto:
   mkdir -p "$repo/.githooks"
   install -m 0755 "$TPL/githooks/commit-msg"  "$repo/.githooks/commit-msg"
   install -m 0755 "$TPL/githooks/post-commit" "$repo/.githooks/post-commit"
+  install -m 0755 "$TPL/githooks/post-merge"  "$repo/.githooks/post-merge"
   local act
   if act="$(ll_activate_git_hooks "$repo")"; then
     say "· git hooks   -> .githooks/ + ${act:-already active} (commit-msg gates, post-commit syncs)"

@@ -40,9 +40,9 @@ LEDGER_REL="${LEDGER#$REPO/}"
 FLOOR="${LL_SYNC_FROM:-$(ll_sync_floor "$REPO")}"   # LL_SYNC_FROM: preview a recovery (with LL_LEDGER_FILE)
 MAX="${LL_SYNC_MAX_COMMITS:-5000}"
 if [ -n "$FLOOR" ] && git cat-file -e "${FLOOR}^{commit}" 2>/dev/null; then
-  RANGE="${FLOOR}..HEAD"
+  RANGE="${FLOOR}..${LL_SYNC_HEAD:-HEAD}"
 else
-  RANGE="HEAD"          # no usable floor: bounded scan, dedup keeps it idempotent
+  RANGE="${LL_SYNC_HEAD:-HEAD}"   # no usable floor: bounded scan, dedup keeps it idempotent
 fi
 
 DECISIONS_REL="$(ll_conf_get "$REPO" DECISIONS_PATH)"
@@ -51,14 +51,16 @@ DECISIONS=""
 [ -n "${LL_DECISIONS_FILE+x}" ] && DECISIONS="${LL_DECISIONS_FILE}"
 
 PYTHONDONTWRITEBYTECODE=1 python3 - "$LEDGER" "$RANGE" "$MAX" "$HERE" "$DECISIONS" \
-  "$LEDGER_REL" "$DECISIONS_REL" <<'PY'
+  "$LEDGER_REL" "$DECISIONS_REL" "$REPO" <<'PY'
 import io, re, subprocess, sys
 sys.path.insert(0, sys.argv[4])
 from _ledger_parse import (ID_RE, ENTRIES_MARKER, KINDS, RELATE_KEYS, MODIFIER_KEYS, LORE_KEYS,
                            hash_id, norm_text, is_legacy, trailer_lines, parse_blocks,
-                           split_ledger, entry_text, entry_commit, supersede_ids, insert_by_date)
+                           split_ledger, entry_text, entry_commit, supersede_ids, insert_by_date,
+                           external_prefixes)
 
-LEDGER, RANGE, MAX, _, DECISIONS, LEDGER_REL, DECISIONS_REL = sys.argv[1:8]
+LEDGER, RANGE, MAX, _, DECISIONS, LEDGER_REL, DECISIONS_REL, REPO = sys.argv[1:9]
+EXT = external_prefixes(REPO)
 orig = io.open(LEDGER, encoding='utf-8').read()
 if ENTRIES_MARKER not in orig:
     sys.stderr.write(f'living-ledger: {LEDGER_REL} has no {ENTRIES_MARKER} marker — not syncing.\n')
@@ -115,11 +117,13 @@ for rec in raw.split(SEP):
     for line in tl:
         key, _, text = line.partition(':')
         text = text.strip()
-        if key == 'Supersedes':
-            olds, news = supersede_ids(text)          # `Supersedes: D-a by D-b` names the survivor
-            actions += [(key, i, news) for i in olds]
-        elif key in RELATE_KEYS:
-            actions += [(key, i, []) for i in ID_RE.findall(text)]
+        if key in RELATE_KEYS:
+            olds, news = supersede_ids(text) if key == 'Supersedes' else (ID_RE.findall(text), [])
+            ours = [i for i in olds if i.split('-')[0] not in EXT]
+            theirs = [i for i in ID_RE.findall(text) if i.split('-')[0] in EXT]
+            actions += [(key, i, news) for i in ours]
+            if theirs:                                # ids of the other register (EXTERNAL_IDS):
+                commit_wide.append(('Refs', ', '.join(theirs)))   # kept as a pointer, not applied
         elif key in KINDS and text:
             made.append(dict(key=key, text=text, extra=[]))
         elif key in MODIFIER_KEYS or key in LORE_KEYS:
@@ -167,7 +171,8 @@ for sha, date, subject, made, actions, commit_wide in commits:
         if get('Pin').lower() in ('yes', 'true', '1', 'y'):
             lines.append('· Pinned')
         lines += [f'· {k}: {v}' for k, v in m['extra'] if k in LORE_KEYS]
-        lines += [f'· {k}: {v}' for k, v in commit_wide if k in LORE_KEYS]
+        lines += [f'· {k}: {v}' for k, v in commit_wide if k in LORE_KEYS or k == 'Refs'
+                  ]
         blocks.append(f'## {eid} · {status} · {typ} · {area} · {hdate}\n'
                       + '\n'.join(lines) + f'\n→ commit {sha}\n')
         if typ in ('decision', 'retired'):

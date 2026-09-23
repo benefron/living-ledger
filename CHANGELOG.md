@@ -67,6 +67,17 @@ late arrivals (a merge, a recovery) keep the file newest-first; an unchanged das
 not rewritten just to move its timestamp; hash ids are never read as legacy ids (tested).
 `LL_SYNC_FROM` previews a recovery of dropped trailers without touching anything.
 
+**Worktrees, merges, other registers**
+- Hooks now find the right checkout in a git worktree. git exports `GIT_DIR` to hooks there,
+  which made the repo-root lookup answer `.claude/hooks`, and `$CLAUDE_PROJECT_DIR` (preferred
+  before) names the main checkout: every worktree commit was a silent no-op for the ledger, in
+  every earlier version.
+- `post-merge` reports entries a merge brought in (it cannot commit: git still holds the merge
+  state); the next commit records them.
+- `EXTERNAL_IDS=C`: id prefixes of another register the repo keeps (a `CONCERNS.md` numbered
+  `C-001`…). The gate accepts `Refs: C-022` and `Opens: C-032 -- <words>`; the sync keeps them as a
+  `· Refs:` pointer. Detected at install from the trailers already in history.
+
 **Upgrade** commits with `Ledger: none` (a template bump is not a project decision) and derives
 pending trailers into the same single commit.
 
