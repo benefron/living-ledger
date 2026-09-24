@@ -93,7 +93,7 @@ session sees, so it goes through the tidy's approval like everything else.
 digest writes; `RECALL_MIN` / `RECALL_MAX` / `RECALL` in `ledger.conf`; the tidy report's last
 section.
 
-**Ledger id + sha.** D-add0c44 · this commit
+**Ledger id + sha.** D-add0c44 · `58f67cc`
 
 **Validation pending.** The replay is small (two repositories, one judge). The calibration log is
 the real test: the first tidy with 30 recalls says whether 2.0 holds.
