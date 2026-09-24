@@ -51,6 +51,36 @@ And on the section it replaces, add one line — nothing else changes:
 <!-- newest first; written by hand -->
 <!-- SECTIONS_START -->
 
+## D-7269818 · Closes: closes a finding, never a decision, retired framing or note · 2026-09-24
+
+**What was decided.** "a Closes: trailer resolves an open item or a finding, including one
+recorded as a fact; a decision, a retired framing or a note is never closed — the gate refuses it
+and points to Supersedes: or Refs:"
+
+**Why.** F-e118b73: the sync only flipped OPEN entries, so `Closes:` on anything else added a
+`✓ closed by` line and changed nothing. Since v4 made `Finding:` a STANDING fact (D-3c1386a), the
+common case is a problem written as `Finding:` out of v3 habit and closed once fixed. The entry
+stayed STANDING, and the digest kept listing it under "Recently decided / established". Closing
+it now gives the same entry as `Opens:` followed by `Closes:`, a resolved finding, which is what
+the user meant. `Closes:` on a decision had the same silent no-op: the ✓ line said closed, and the
+decision stayed in force.
+
+**What was rejected.** *Flipping every STANDING entry to CLOSED* (retired framings and notes too).
+Closing a retired framing would take it off the "do NOT re-propose" list, and out of the gate's
+re-adoption check, without the `Decision:` + `Supersedes:` that D-be290b3 requires. *Refusing
+`Closes:` on any STANDING entry.* A fixed problem that was written as `Finding:` would then have
+no honest path: `Supersedes:` says replaced, not resolved. The only other route is a hand edit to
+OPEN first.
+
+**Where it lives.** `close_refusal` in `templates/hooks/_ledger_parse.py`. The gate
+(`check_body`) and the sync (`ledger-sync.sh`, the `Closes` branch) both call it. The tidy
+report's "A Closes: that changed nothing" section catches entries an older sync left behind: a
+closed entry is never re-flipped on a re-scan, because a hand re-open has to stick.
+
+**Ledger id + sha.** D-7269818 · (the commit that closes F-e118b73)
+
+**Validation pending.** None. Settled. Tests: section 5b of `tests/run_tests.sh`.
+
 ## D-add0c44 · Prompt-time recall, calibrated at tidy · 2026-09-24
 
 **What was decided.** "each message the user types is matched against the whole ledger, and up to

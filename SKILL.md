@@ -51,7 +51,7 @@ In the **last paragraph** of a commit message, one per line (a long one may wrap
 | `Fixed: <one line>` | a problem found **and** resolved in this commit | `F-…` CLOSED |
 | `Action: <one line>` | a to-do (pair with `Due:` / `Owner:`) | `A-…` OPEN |
 | `Retires: <framing>` | an approach that is now dead — never re-propose | `R-…` STANDING |
-| `Closes: <id>` | resolves an open finding / action | → CLOSED, `✓ closed by <sha>` |
+| `Closes: <id>` | resolves an open item, or a finding recorded as a fact that turned out to be a problem — never a decision, retired framing or note (the gate refuses; use `Supersedes:` / `Refs:`) | → CLOSED, `✓ closed by <sha>` |
 | `Supersedes: <id>` | with a new `Decision:` — the old one is replaced; or `Supersedes: <old> by <new>` to fold a duplicate into its survivor | → SUPERSEDED, `⤳ superseded by` |
 | `Refs: <id>, <id>` | this commit relates to existing entries | `↔ <sha> <subject>` backlink |
 | `Ledger: none — <reason>` | explicit opt-out; reason ≥ 3 words | nothing |

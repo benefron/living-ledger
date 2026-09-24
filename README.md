@@ -115,7 +115,7 @@ In the **last paragraph** of a commit message, one per line (a long one may wrap
 | `Fixed: <line>` | a problem found and fixed in this commit | `F-…` CLOSED |
 | `Action: <line>` | a to-do | `A-…` OPEN |
 | `Retires: <framing>` | an approach that is dead — never re-propose | `R-…` STANDING |
-| `Closes: <id>` | resolves an open item | → CLOSED |
+| `Closes: <id>` | resolves an open item or a finding (never a decision, retired framing or note) | → CLOSED |
 | `Supersedes: <id>` | with a `Decision:`: replaces an earlier decision | → SUPERSEDED |
 | `Supersedes: <old> by <new>` | folds a duplicate into its survivor | → SUPERSEDED |
 | `Refs: <id>, …` | relates this commit to existing entries | backlink |

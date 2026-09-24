@@ -393,6 +393,28 @@ def is_dead(e):
     return e['status'] == 'CLOSED' and e['type'] in ('finding', 'action')
 
 
+def close_refusal(status, typ, eid='<id>'):
+    """Why `Closes: <eid>` may not act on an entry of this status and type — '' if it may.
+
+    `Closes:` resolves what can be resolved: an open item, or a finding / action — including one
+    recorded as a fact (STANDING) that turned out to be a problem. A decision, a retired framing
+    or a note is never closed: it changes only by `Supersedes:`, so the change carries its reason
+    (and a retired framing cannot drop off the do-not-re-propose list unexplained). The commit
+    gate and the sync both ask this, so they cannot disagree."""
+    if status == 'OPEN' or typ in ('finding', 'action'):
+        return ''
+    if typ == 'decision':
+        return (f"{eid} is a decision, and a decision is never closed: it stays in force until "
+                f"replaced. If this commit enacts it: `Refs: {eid}`. If it replaces or revokes it: "
+                f"`Supersedes: {eid}` (with the new `Decision:`, if there is one).")
+    if typ == 'retired':
+        return (f"{eid} is a retired framing, and it is never closed: it stays retired until a "
+                f"decision takes it back up. To revive it: a `Decision:` with `Supersedes: {eid}`. "
+                f"If this commit only touches it: `Refs: {eid}`.")
+    return (f"{eid} is a {typ}, and a {typ} is never closed. If it no longer holds: "
+            f"`Supersedes: {eid}`. If this commit follows it up: `Refs: {eid}`.")
+
+
 def stale_rules(ledger_path, rules_dir):
     """Rules that outlived the entry they were written for.
 
@@ -626,9 +648,9 @@ def check_body(body, root, author, structural_only=False):
     tl = trailer_lines(body)
     ledger = '' if structural_only else _ledger_path(root)
     try:
-        known = {e['id'] for e in parse_entries(ledger)} if ledger else set()
+        known = {e['id']: e for e in parse_entries(ledger)} if ledger else {}
     except Exception:
-        known = set()
+        known = {}
     declared = {m.group(1) for l in tl for m in [re.match(r'^Opens:\s+(F-\S+)\s+\S', l)] if m}
     ext = external_prefixes(root)
     related = entries = False
@@ -660,6 +682,10 @@ def check_body(body, root, author, structural_only=False):
                     problems.append(f"`{key}: {i}` — there is no entry {i} in "
                                     f"{os.path.relpath(ledger, root)}. (On another branch? Merge it "
                                     f"first, or use --no-verify.)")
+                elif key == 'Closes' and i in known:
+                    why = close_refusal(known[i]['status'], known[i]['type'], i)
+                    if why:
+                        problems.append(f"`Closes: {i}` — {why}")
             related = related or bool(ids)
         elif key == 'Ledger':
             m = re.match(r'^none\b[\s\W]*(.*)$', val, re.I)
@@ -931,6 +957,22 @@ def tidy_report(ledger, root, max_open=22):
         elif re.match(r'fix\b|fix[(:]', subj):
             settled.append(line(e, f'born in a fix commit ({c})', 'CLOSED if the fix covers it'))
     section('Open, but possibly settled', settled)
+
+    # 1b. a `✓ closed by` line on an entry whose status that close never changed: a finding
+    # closed while it was STANDING (before Closes: acted on one), or a decision / retired
+    # framing / note, which Closes: never ends. A hand re-open to OPEN is not flagged.
+    noop = []
+    for e in live:
+        c = next((l.split()[3] for l in e['lines'] if l.startswith('✓ closed by ')
+                  and len(l.split()) > 3), '')
+        if not c or e['status'] == 'OPEN':
+            continue
+        if e['type'] in ('finding', 'action'):
+            noop.append(line(e, f'closed in {c}, still {e["status"]}', 'CLOSED (hand-edit its header)'))
+        elif close_refusal(e['status'], e['type']):
+            noop.append(line(e, f'a Closes: in {c} never changed it',
+                             f'Supersedes: {e["id"]} if that commit ended it; otherwise leave it'))
+    section('A Closes: that changed nothing', noop)
 
     # 2. overdue and aging open items
     aging = []

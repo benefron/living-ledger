@@ -19,6 +19,11 @@ rewriting or renumbering any entry.
 - The digest records which entries it showed, per session, so recall does not repeat them.
 - `ledger search <words>`: BM25 over every entry, live or dead, with its status and what
   replaced it; an id named in the query ranks first.
+- **`Closes:` by type.** `Closes:` on a STANDING finding now closes it (it used to add a `✓` line
+  and leave it STANDING, so the digest kept showing it as established). A decision, a retired
+  framing or a note is never closed: the gate refuses `Closes:` on one and names `Supersedes:` /
+  `Refs:`, and the sync reports a commit that skipped the gate and leaves the entry alone. The
+  tidy report lists entries an older sync left with a `✓` line and an unchanged status.
 
 ## v4 — 2026-09-23
 

@@ -33,7 +33,7 @@ The separator between header fields is ` · ` (space, U+00B7, space).
 | `Fixed: <line>` | `F-…` | `finding` | `CLOSED` — found and resolved in the same commit |
 | `Action: <line>` | `A-…` | `action` | `OPEN` |
 | `Retires: <framing>` | `R-…` | `retired` | `STANDING` |
-| `Closes: <id>` | that entry `OPEN` → `CLOSED`, plus `✓ closed by <sha> <subject>` | | |
+| `Closes: <id>` | an open item, or a `STANDING` finding/action, → `CLOSED`, plus `✓ closed by <sha> <subject>`. Never a decision, retired framing or note: the gate refuses it (see below) | | |
 | `Supersedes: <id>` | that entry → `SUPERSEDED`, plus `⤳ superseded by <the commit's new decisions> in <sha>` | | |
 | `Supersedes: <old> by <new>` | the same, naming the survivor — how a tidy folds a duplicate | | |
 | `Tidy: <summary>` | nothing; marks a tidy pass, from which "tidy due" counts again | | |
@@ -62,11 +62,16 @@ rejects a ledger line that sits outside that block instead of letting it be sile
 | type | born | moves to |
 |---|---|---|
 | decision | `CLOSED` (in force) | `SUPERSEDED` via `Supersedes:` |
-| finding (fact) | `STANDING` | `SUPERSEDED` if it turns out wrong |
+| finding (fact) | `STANDING` | `SUPERSEDED` if it turns out wrong; `CLOSED` via `Closes:` if it was really a problem, now resolved |
 | finding (problem) | `OPEN` | `CLOSED` via `Closes:` |
 | action | `OPEN` | `CLOSED` via `Closes:` |
-| retired | `STANDING` | — |
-| note / thought | `STANDING` | — |
+| retired | `STANDING` | `SUPERSEDED` via a `Decision:` + `Supersedes:` that takes it back up |
+| note / thought | `STANDING` | `SUPERSEDED` via `Supersedes:` if it no longer holds |
+
+`Closes:` never touches a decision, a retired framing or a note — each changes only by
+`Supersedes:`, so the change carries its reason and a retired framing cannot leave the
+do-not-re-propose list unexplained. The `commit-msg` gate refuses `Closes:` on one and names
+`Supersedes:` / `Refs:`; a commit that skipped the gate is reported by the sync and left alone.
 
 A rule in `.claude/rules/` is **stale** when it cites a `CLOSED` finding/action or any
 `SUPERSEDED` entry; a rule citing an in-force decision is not.

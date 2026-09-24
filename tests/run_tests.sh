@@ -151,6 +151,57 @@ sync_ "$R"
 check "unknown id warns on stderr"      "grep -q 'F-9999999' '$WORK/syncerr'"
 
 # ---------------------------------------------------------------------------
+echo "5b. Closes: closes a finding; never a decision, a retired framing or a note"
+C="$(newrepo closes)"; installed "$C"
+commit "$C" "feat: facts
+
+Finding: the parser drops the last line of a file with no trailing newline
+Decision: keep the parser line-based
+Retires: a regex over the whole file"
+sync_ "$C"
+FACT="$(hid F 'the parser drops the last line of a file with no trailing newline')"
+DEC="$(hid D 'keep the parser line-based')"
+RET="$(hid R 'a regex over the whole file')"
+check "a STANDING finding shows as established"  "digest '$C' | grep -q 'drops the last line'"
+commit "$C" "fix: keep the last line
+
+Closes: $FACT"
+sync_ "$C"
+check "Closes: flips a STANDING finding to CLOSED" "grep -q \"^## $FACT · CLOSED\" '$C/LEDGER.md' && blk '$C' $FACT | grep -q '^✓ closed by '"
+check "…and the digest stops showing it"          "! digest '$C' | grep -q 'drops the last line'"
+perl -pi -e "s/^## $FACT · CLOSED/## $FACT · STANDING/" "$C/LEDGER.md"
+sync_ "$C"
+check "a hand re-open to STANDING survives re-scans" "grep -q \"^## $FACT · STANDING\" '$C/LEDGER.md'"
+commit "$C" "chore: made without the gate
+
+Closes: $DEC, $RET"
+sync_ "$C"
+check "sync: Closes: leaves a decision alone, and says so" "grep -q \"^## $DEC · CLOSED · decision\" '$C/LEDGER.md' && ! blk '$C' $DEC | grep -q '✓ closed' && grep -q \"Closes $DEC .*ignored\" '$WORK/syncerr'"
+check "sync: …and a retired framing"                       "grep -q \"^## $RET · STANDING\" '$C/LEDGER.md' && ! blk '$C' $RET | grep -q '✓ closed' && grep -q \"Closes $RET .*ignored\" '$WORK/syncerr'"
+check "a note is never closed either" "python3 -c \"import sys; sys.path.insert(0,'$SKILL/templates/hooks'); from _ledger_parse import close_refusal as r; assert r('STANDING','note') and r('STANDING','thought') and not r('STANDING','finding') and not r('OPEN','action') and not r('STANDING','action')\""
+# a close from before this rule: a ✓ line on an entry the Closes: never changed
+LEG="$(hid F 'a fact closed before Closes: flipped STANDING findings')"
+commit "$C" "feat: legacy
+
+Finding: a fact closed before Closes: flipped STANDING findings"
+sync_ "$C"
+perl -0pi -e "s/(^## $LEG · STANDING[^\n]*\n[^\n]*\n)/\$1✓ closed by 0000000 an old close\n/m" "$C/LEDGER.md"
+perl -0pi -e "s/(^## $DEC · CLOSED[^\n]*\n[^\n]*\n)/\$1✓ closed by 0000001 an old close\n/m" "$C/LEDGER.md"
+REP="$(python3 "$C/.claude/hooks/_ledger_parse.py" tidy-report "$C/LEDGER.md" "$C")"
+check "tidy: a STANDING finding with a ✓ line -> CLOSED" "printf '%s' \"\$REP\" | grep -A3 '^## A Closes: that changed nothing' | grep -q \"$LEG .*→ CLOSED\""
+check "tidy: a decision with a ✓ line -> Supersedes or leave" "printf '%s' \"\$REP\" | grep -A3 '^## A Closes: that changed nothing' | grep -q \"$DEC .*Supersedes: $DEC\""
+CG="$(newrepo closegate)"; installed "$CG"
+hc "$CG" -m "feat: exports" -m "Finding: the export writes UTC timestamps
+Decision: exports are CSV only
+Retires: an XML export"
+F2="$(hid F 'the export writes UTC timestamps')"; D2="$(hid D 'exports are CSV only')"; R2="$(hid R 'an XML export')"
+hc "$CG" -m "x" -m "Closes: $D2";   check "gate: Closes: on a decision -> rejected (Refs / Supersedes)" "grep -q 'REJECTED.*Closes: $D2' '$WORK/err' && grep -q 'Refs: $D2' '$WORK/err' && grep -q 'Supersedes: $D2' '$WORK/err'"
+hc "$CG" -m "x" -m "Closes: $R2";   check "gate: Closes: on a retired framing -> rejected (Supersedes)" "grep -q 'REJECTED.*Closes: $R2' '$WORK/err' && grep -q 'Supersedes: $R2' '$WORK/err'"
+hc "$CG" -m "fix: x" -m "Closes: $F2"; check "gate: Closes: on a STANDING finding -> accepted" "[ \$? -eq 0 ]"
+check "…and post-commit closes it" "grep -q \"^## $F2 · CLOSED\" '$CG/LEDGER.md'"
+check "validate (history only) does not judge Closes: targets" "python3 -c \"import sys; sys.path.insert(0,'$SKILL/templates/hooks'); from _ledger_parse import check_body; assert not check_body('x\n\nCloses: $D2', '$CG', 't', structural_only=True)\""
+
+# ---------------------------------------------------------------------------
 echo "6. stateless: every clone derives the same ledger"
 HDRS="$(hdrs "$R" | sort)"
 cp "$SKILL/templates/LEDGER.md" "$R/LEDGER.md"

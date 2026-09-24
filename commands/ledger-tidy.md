@@ -35,7 +35,9 @@ python3 .claude/hooks/_ledger_parse.py tidy-report <ledger> "$(git rev-parse --s
 ```
 
 It lists candidates, each with the reason it was flagged: open items that read as settled,
-overdue or aging items, similar entries (duplicate, refinement or contradiction), open items that
+a `Closes:` that changed nothing (a finding closed while it was STANDING, before `Closes:` acted
+on one, or a decision / retired framing / note it never ends), overdue or aging items, similar
+entries (duplicate, refinement or contradiction), open items that
 mirror another register's item (`EXTERNAL_IDS`) beside that register's own status, empty entries,
 long-pinned entries, recent decisions with no written reasoning, stale rules, lint, and other
 files in the repo that keep their own lists (retired framings, concerns, status docs), and last,
@@ -53,7 +55,8 @@ Proposals, and how each is applied:
 
 | Proposal | Applied as |
 |---|---|
-| resolved | `Closes: F-…` trailer on the tidy commit (leaves `✓ closed by <sha>`) |
+| resolved | `Closes: F-…` trailer on the tidy commit (leaves `✓ closed by <sha>`) — for an open item or a finding; a decision, retired framing or note is never closed (the gate refuses it): it changes by `Supersedes:` |
+| a `Closes:` that changed nothing | a finding/action: hand edit its header to `CLOSED` (the `✓` line is already there). A decision / retired framing / note: `Supersedes: <it>` if that commit ended it, otherwise leave it |
 | a settled fact, not a problem | hand edit: `OPEN` → `STANDING` in its header, plus a body line `· tidied <date>: a settled result, not an open problem` |
 | duplicate of a newer entry | `Supersedes: D-old by D-new` (the old one gains `⤳ superseded by D-new`) |
 | contradiction | ask the user which holds; the loser gets `Supersedes: … by …` — or, if the question is genuinely open again, a new `Opens:` |

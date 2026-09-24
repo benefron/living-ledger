@@ -86,7 +86,8 @@ Three capture paths, all cheap:
    Opens:      <one line>              an open problem or question    -> F-…, OPEN
    Fixed:      <one line>              found and resolved right here  -> F-…, CLOSED
    Action:     <one line>              a to-do                        -> A-…, OPEN
-   Closes:     F-3fa9c1e               resolves an open entry
+   Closes:     F-3fa9c1e               resolves an open item or a finding -> CLOSED (a decision,
+                                       retired framing or note: Supersedes: it instead)
    Retires:    <the framing>           an approach that is now dead   -> R-…, STANDING
    Supersedes: D-8b1e0d2               with a Decision: — marks the old one SUPERSEDED
    Refs:       F-3fa9c1e, D-004        relates this commit to existing entries (backlink)
