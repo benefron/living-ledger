@@ -128,6 +128,22 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-8db1c00 · CLOSED · decision · platform · 2026-09-24
+every ledger hook runs through bash, never by its executable bit, and every file the tool writes uses Unix line endings on every platform
+→ commit e5fe0dd
+
+## F-10dae2b · CLOSED · finding · platform · 2026-09-24
+hook scripts committed from a Windows checkout lost their executable bit, and on macOS and Linux clones the shim, the settings hooks and the digest skipped them silently, so there was no commit gate, sync or recall
+→ commit e5fe0dd
+
+## F-8d550a5 · CLOSED · finding · platform · 2026-09-24
+on Windows the merge driver and the sync wrote the ledger with CRLF line endings, so the next sync on another platform rewrote every line
+→ commit e5fe0dd
+
+## F-4063b5f · STANDING · finding · platform · 2026-09-24
+the two repositories worked from a Windows lab PC ran the v1 digest and sync through September, and on 2026-09-24 the v5 upgrade, a merge through the ledger merge driver and the post-commit sync
+→ commit e5fe0dd
+
 ## D-216a12f · CLOSED · decision · - · 2026-09-24
 template v5 ships as release v5.0.0: prompt-time recall calibrated at tidy, ledger search, and Closes: by entry type
 → commit 4de35d5
