@@ -5,7 +5,10 @@ running an older template is flagged at session start with `LEDGER UPGRADE AVAIL
 `/ledger-init --upgrade` (or `install.sh <repo> --upgrade`) upgrades it in one commit without
 rewriting or renumbering any entry.
 
-## Unreleased (template v5)
+## v5 — 2026-09-24
+
+Recall: the part of the ledger the session digest leaves out now reaches Claude when a message
+touches it — measured on real sessions before it was built, and recalibrated at every tidy.
 
 - **Prompt-time recall** (`ledger-recall.sh`, a UserPromptSubmit hook): each message is matched
   against the whole ledger; up to `RECALL_MAX` (3) entries the digest did not show, scoring at
