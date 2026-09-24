@@ -130,6 +130,7 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 ## D-add0c44 · CLOSED · decision · recall · 2026-09-24
 each message the user types is matched against the whole ledger, and up to three entries the session digest did not show are put in front of Claude when they score at least RECALL_MIN (2.0)
 → commit 58f67cc
+↔ 9bcbadc docs(decisions): the sha of D-add0c44
 
 ## D-f4db0bf · CLOSED · decision · recall · 2026-09-24
 the recall threshold is recalibrated at /ledger-tidy from whether recalled ids were cited, in steps of 0.25 between 1.5 and 3.5 once 30 recalls are logged, and the change is committed to ledger.conf
