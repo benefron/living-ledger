@@ -5,9 +5,9 @@ running an older template is flagged at session start with `LEDGER UPGRADE AVAIL
 `/ledger-init --upgrade` (or `install.sh <repo> --upgrade`) upgrades it in one commit without
 rewriting or renumbering any entry.
 
-## Unreleased (template v6)
+## v6 — 2026-09-24
 
-Found by running v5 on a Windows lab PC and pulling its repositories on a Mac.
+Windows: found by running v5 on a Windows lab PC and pulling its repositories on a Mac.
 
 - **Hooks no longer depend on the executable bit.** Git on Windows ignores it, so scripts a
   Windows checkout committed were non-executable. On macOS and Linux clones, the shim skipped a
