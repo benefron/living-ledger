@@ -268,4 +268,6 @@ Do not hand-edit between the markers.
 | 2026-09-23 | D-be290b3 | the commit gate refuses a Decision that re-adopts a rejected alternative or a retired framing unless the commit supersedes it | `aaa8b3c` |
 | 2026-09-23 | D-a188554 | the commit gate's rejection message shows three examples and the opt-out and says Claude normally writes them; the full vocabulary lives at the top of the ledger | `ce6e809` |
 | 2026-09-24 | D-14aa29c | `ledger search <words>` ranks every ledger entry, including retired and superseded ones, by BM25 over its text and annotations | `f082dda` |
+| 2026-09-24 | D-add0c44 | each message the user types is matched against the whole ledger, and up to three entries the session digest did not show are put in front of Claude when they score at least RECALL_MIN (2.0) | `58f67cc` |
+| 2026-09-24 | D-f4db0bf | the recall threshold is recalibrated at /ledger-tidy from whether recalled ids were cited, in steps of 0.25 between 1.5 and 3.5 once 30 recalls are logged, and the change is committed to ledger.conf | `58f67cc` |
 <!-- DECISIONS_LOG_END -->

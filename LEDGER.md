@@ -127,6 +127,23 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-add0c44 · CLOSED · decision · recall · 2026-09-24
+each message the user types is matched against the whole ledger, and up to three entries the session digest did not show are put in front of Claude when they score at least RECALL_MIN (2.0)
+→ commit 58f67cc
+
+## D-f4db0bf · CLOSED · decision · recall · 2026-09-24
+the recall threshold is recalibrated at /ledger-tidy from whether recalled ids were cited, in steps of 0.25 between 1.5 and 3.5 once 30 recalls are logged, and the change is committed to ledger.conf
+→ commit 58f67cc
+
+## F-e4cc657 · STANDING · finding · recall · 2026-09-24
+replayed on 167 real messages, recall at RECALL_MIN 2.0 fired on 13% of them and a blind judge rated 81% of what it showed relevant; long pasted reports produced most of the noise
+· Rejected: a plan-time ledger check on ExitPlanMode | in 19 real plans every strong hit was already cited by the plan
+→ commit 58f67cc
+
+## F-e118b73 · OPEN · finding · recall · 2026-09-24
+a Closes: trailer on a STANDING finding adds a closed line but leaves the entry STANDING, so the digest keeps showing a fact the user closed
+→ commit 58f67cc
+
 ## D-14aa29c · CLOSED · decision · cli · 2026-09-24
 `ledger search <words>` ranks every ledger entry, including retired and superseded ones, by BM25 over its text and annotations
 → commit f082dda
