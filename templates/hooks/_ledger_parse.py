@@ -34,7 +34,7 @@ Copied verbatim into each repo as .claude/hooks/_ledger_parse.py. Entrypoints:
     _ledger_parse.py cli <repo_root> <command> [args]     (what `.claude/hooks/ledger` runs)
         -> the query side of the Lore protocol over this repo, for any agent or person:
            context|directives|constraints|rejected <path>, open, decisions, retired,
-           stale, validate, rules, tidy, share. `ledger help` lists them.
+           stale, validate, rules, tidy, share, search. `ledger help` lists them.
 
     _ledger_parse.py check-msg <commit-msg-file> <repo_root>
         -> the commit gate (called by .githooks/commit-msg): exit 1 with the reason on stderr
@@ -1331,6 +1331,8 @@ CLI_HELP = """ledger — query this repo's ledger and the decision history in it
   ledger context <path>       everything recorded about a file or directory: directives,
                               constraints, rejected alternatives, untested areas, entries
   ledger directives <path>    …only the directives   (also: constraints, rejected)
+  ledger search <words>       entries about a topic — live, closed, superseded or retired —
+                              ranked by relevance (an id in the words ranks first)
   ledger open                 open problems, questions and actions (overdue first)
   ledger decisions            decisions in force, newest first
   ledger retired              approaches that are dead — never re-propose these
@@ -1356,6 +1358,12 @@ def cmd_cli(argv):
         only = {'directives': 'Directive', 'constraints': 'Constraint', 'rejected': 'Rejected'}.get(cmd)
         return context(root, ledger, rest[0], only)
     entries = parse_entries(ledger)
+    if cmd == 'search':
+        if not rest:
+            return "usage: ledger search <words>"
+        hits = search(entries, ' '.join(rest), k=12)
+        return "\n".join(f"- {_status_line(e)} — {entry_text(e)[:180]}  [{sc}]" for sc, e, _ in hits) \
+            or "Nothing in the ledger matches."
     if cmd == 'open':
         today = datetime.date.today().isoformat()
         op = [e for e in entries if e['status'] == 'OPEN']
@@ -1381,6 +1389,84 @@ def cmd_cli(argv):
     if cmd == 'share':
         return "\n".join(share_lines(root)) or "Everything is shared."
     return f"unknown command: {cmd}\n\n{CLI_HELP}"
+
+
+# --- search: the ledger by topic (BM25 over every entry, live or dead) -------------------------
+
+SEARCH_STOP = STOP | set(
+    'about above after again also any because been before being both but can could did does '
+    'doing done down during few from further had has have having here how its just like make '
+    'made more most much need not now off once other our out over own same should some still '
+    'such than that their them then there these they this those through too under until very '
+    'was were what when where which while who why will with would you your yes let lets want '
+    'think know see look going get got use used using ledger entry entries commit commits'.split())
+
+
+def _stem(w):
+    if len(w) > 5 and w.endswith('ing'):
+        return w[:-3]
+    if len(w) > 4 and w.endswith('ies'):
+        return w[:-3] + 'y'
+    if len(w) > 4 and w.endswith('ed'):
+        return w[:-2]
+    if len(w) > 3 and w.endswith('s') and not w.endswith('ss'):
+        return w[:-1]
+    return w
+
+
+def _terms(text):
+    return [_stem(w) for w in re.findall(r'[a-z0-9_]+', text.lower())
+            if len(w) >= 3 and w not in SEARCH_STOP and not w.isdigit()]
+
+
+def _doc(e):
+    """What an entry is searchable by: its statement, its modifier/Lore lines, what replaced it."""
+    return ' '.join([entry_text(e)] + [l for l in e['lines'] if l[:1] in ('·', '⤳')])
+
+
+def search(entries, query, k=10, exclude=(), min_terms=1):
+    """BM25 ranking of entries for a free-text query. An id named in the query ranks first.
+    -> [(score, entry, matched_terms)]"""
+    import math
+    docs = [(e, _terms(_doc(e))) for e in entries]
+    n = len(docs) or 1
+    avg = sum(len(t) for _, t in docs) / n or 1.0
+    df = {}
+    for _, t in docs:
+        for w in set(t):
+            df[w] = df.get(w, 0) + 1
+    q = list(dict.fromkeys(_terms(query)))
+    named = set(ID_RE.findall(query))
+    out = []
+    for e, t in docs:
+        if e['id'] in exclude:
+            continue
+        tf = {}
+        for w in t:
+            tf[w] = tf.get(w, 0) + 1
+        matched = [w for w in q if w in tf]
+        score = 0.0
+        for w in matched:
+            idf = math.log(1 + (n - df[w] + 0.5) / (df[w] + 0.5))
+            f = tf[w]
+            score += idf * f * 2.2 / (f + 1.2 * (0.25 + 0.75 * len(t) / avg))
+        if e['id'] in named:
+            score += 100.0
+        elif len(matched) < min_terms:
+            continue
+        if score > 0:
+            out.append((round(score, 2), e, matched))
+    out.sort(key=lambda x: -x[0])
+    return out[:k]
+
+
+def _status_line(e):
+    extra = ''
+    if e['status'] == 'SUPERSEDED':
+        by = next((l for l in e['lines'] if l.startswith('⤳')), '')
+        m = re.search(r'superseded by ([^ ]+(?:, [^ ]+)*) in', by)
+        extra = f" by {m.group(1)}" if m else ''
+    return f"{e['id']} · {e['status']}{extra} · {e['type']} · {e['date']}"
 
 
 def cmd_id(argv):

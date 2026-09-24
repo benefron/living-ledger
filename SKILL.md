@@ -111,6 +111,8 @@ cited freely.
 
 `.claude/hooks/ledger context <path>` — the directives, constraints, rejected alternatives and
 entries recorded for it. (Claude also gets the generated rules for a file when it opens it.)
+Before proposing a plan or an approach, `.claude/hooks/ledger search <its key words>` — the
+digest shows only what is live and recent; search also finds the retired and superseded.
 After pulling work made elsewhere, `.claude/hooks/ledger validate` shows commits that skipped
 the ledger's rules.
 

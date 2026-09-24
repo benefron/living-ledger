@@ -601,6 +601,27 @@ L1 rules >/dev/null
 check "a superseded decision's rule is withdrawn" "[ -z \"\$(ls '$LQ/.claude/rules/ledger/' 2>/dev/null)\" ]"
 
 # ---------------------------------------------------------------------------
+echo "13h. ledger search"
+SR="$(newrepo search)"; installed "$SR"
+commit "$SR" "a
+
+Decision: water-filling answers spike-rate allocation, not the neuron count
+Retires: report the neuron count as a bracket between the knee and water-filling"
+commit "$SR" "b
+
+Decision: the decoder computes its gain in observation space
+Supersedes: $(hid D 'water-filling answers spike-rate allocation, not the neuron count')"
+commit "$SR" "c
+
+Finding: the vendor API caps requests at ten per second"
+sync_ "$SR"
+S1() { ( cd "$SR" && .claude/hooks/ledger search "$@" ); }
+check "search finds by topic, retired and superseded included" "S1 should we use water-filling for allocation > '$WORK/s1'; grep -q 'retired' '$WORK/s1' && grep -q 'SUPERSEDED by' '$WORK/s1'"
+check "…ranked: the matching entries before unrelated ones" "! head -2 '$WORK/s1' | grep -q 'vendor API'"
+check "an id in the words ranks first" "S1 $(hid F 'the vendor API caps requests at ten per second') | head -1 | grep -q 'vendor API'"
+check "nothing relevant → says so" "S1 kubernetes helm chart | grep -q 'Nothing in the ledger matches'"
+
+# ---------------------------------------------------------------------------
 echo "14. the user-level session hook"
 SESS="$SKILL/bin/ledger-session.sh"
 NL="$(newrepo noledger)"

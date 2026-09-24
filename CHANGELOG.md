@@ -5,6 +5,11 @@ running an older template is flagged at session start with `LEDGER UPGRADE AVAIL
 `/ledger-init --upgrade` (or `install.sh <repo> --upgrade`) upgrades it in one commit without
 rewriting or renumbering any entry.
 
+## Unreleased
+
+- `ledger search <words>`: BM25 over every entry, live or dead, with its status and what
+  replaced it; an id named in the query ranks first.
+
 ## v4 — 2026-09-23
 
 From an audit of six repositories that ran v1–v3.

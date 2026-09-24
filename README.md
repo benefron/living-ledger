@@ -176,6 +176,8 @@ a valid Lore repo. Those trailers are also put to work:
   Claude Code rule scoped to the files that commit touched, so Claude sees it when it opens them.
 - **Anti-pattern filtering, enforced** — a new `Decision:` that re-adopts a rejected alternative
   or a retired approach is refused unless the commit supersedes it on purpose.
+- `ledger search <words>` — every entry on a topic, ranked, including the retired and superseded
+  ones the session digest leaves out: "have we been here before?"
 - `ledger stale` (directives whose code changed a lot since), `ledger validate` (history made
   without the hooks), and tags for `Confidence: low` / `Reversibility: irreversible` decisions.
 
