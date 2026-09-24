@@ -127,6 +127,10 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-14aa29c · CLOSED · decision · cli · 2026-09-24
+`ledger search <words>` ranks every ledger entry, including retired and superseded ones, by BM25 over its text and annotations
+→ commit f082dda
+
 ## D-a188554 · CLOSED · decision · - · 2026-09-23
 the commit gate's rejection message shows three examples and the opt-out and says Claude normally writes them; the full vocabulary lives at the top of the ledger
 → commit ce6e809
