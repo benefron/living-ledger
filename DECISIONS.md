@@ -77,7 +77,7 @@ OPEN first.
 report's "A Closes: that changed nothing" section catches entries an older sync left behind: a
 closed entry is never re-flipped on a re-scan, because a hand re-open has to stick.
 
-**Ledger id + sha.** D-7269818 · (the commit that closes F-e118b73)
+**Ledger id + sha.** D-7269818 · `d1d6187`
 
 **Validation pending.** None. Settled. Tests: section 5b of `tests/run_tests.sh`.
 

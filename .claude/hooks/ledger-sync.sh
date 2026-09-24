@@ -5,7 +5,10 @@
 # (see _ledger_parse.trailer_lines — the same reader the commit gate uses) into changes:
 #
 #   Decision: Finding: Opens: Fixed: Action: Retires:  -> a new entry (content-hash id)
-#   Closes: F-x          -> F-x becomes CLOSED, with a `✓ closed by <sha>` line
+#   Closes: F-x          -> F-x (an open item, or a finding/action) becomes CLOSED, with a
+#                           `✓ closed by <sha>` line; a decision, retired framing or note never
+#                           closes — the gate refuses it, and the sync warns and leaves it
+#                           (close_refusal in _ledger_parse.py)
 #   Supersedes: D-x      -> D-x becomes SUPERSEDED, with `⤳ superseded by <new id>`
 #   Refs: F-x, D-y       -> a `↔ <sha> <subject>` backlink on each
 #   Due: Owner: Area: Pin: Date:                 -> modifiers of the entry trailer above them
@@ -54,10 +57,10 @@ PYTHONDONTWRITEBYTECODE=1 python3 - "$LEDGER" "$RANGE" "$MAX" "$HERE" "$DECISION
   "$LEDGER_REL" "$DECISIONS_REL" "$REPO" <<'PY'
 import io, re, subprocess, sys
 sys.path.insert(0, sys.argv[4])
-from _ledger_parse import (ID_RE, ENTRIES_MARKER, KINDS, RELATE_KEYS, MODIFIER_KEYS, LORE_KEYS,
-                           hash_id, norm_text, is_legacy, trailer_lines, parse_blocks,
+from _ledger_parse import (ID_RE, HDR, ENTRIES_MARKER, KINDS, RELATE_KEYS, MODIFIER_KEYS,
+                           LORE_KEYS, hash_id, norm_text, is_legacy, trailer_lines, parse_blocks,
                            split_ledger, entry_text, entry_commit, supersede_ids, insert_by_date,
-                           external_prefixes)
+                           external_prefixes, close_refusal)
 
 LEDGER, RANGE, MAX, _, DECISIONS, LEDGER_REL, DECISIONS_REL, REPO = sys.argv[1:9]
 EXT = external_prefixes(REPO)
@@ -225,7 +228,19 @@ for kind, tid, sha, subject, extra in closes:
         s, found = edit_block(s, tid, (), '', f'↔ {sha} {subj}'.rstrip(),
                               lambda l, h=sha: l.startswith(f'↔ {h}'))
     elif kind == 'Closes':
-        s, found = edit_block(s, tid, ('OPEN',), 'CLOSED', f'✓ closed by {sha} {subj}'.rstrip(),
+        # an open item or a finding/action closes; a decision, retired framing or note never
+        # does (close_refusal — the gate's own rule). A commit that got past the gate anyway is
+        # reported and left alone, unless an older sync already applied it.
+        span = find_block(s, tid)
+        blk = s[span[0]:span[1]] if span else ''
+        hm = HDR.match(blk.split('\n', 1)[0])
+        done = any(l.strip().startswith(f'✓ closed by {sha}') for l in blk.splitlines()[1:])
+        why = close_refusal(hm.group(2), hm.group(3), tid) if hm and not done else ''
+        if why:
+            sys.stderr.write(f'living-ledger: Closes {tid} in {sha} ignored — {why}\n')
+            continue
+        s, found = edit_block(s, tid, ('OPEN', 'STANDING'), 'CLOSED',
+                              f'✓ closed by {sha} {subj}'.rstrip(),
                               lambda l, h=sha: l.startswith(f'✓ closed by {h}'))
     else:
         what = f'superseded by {extra}' if extra else 'superseded'
