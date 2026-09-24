@@ -56,7 +56,7 @@ Proposals, and how each is applied:
 | Proposal | Applied as |
 |---|---|
 | resolved | `Closes: F-…` trailer on the tidy commit (leaves `✓ closed by <sha>`) — for an open item or a finding; a decision, retired framing or note is never closed (the gate refuses it): it changes by `Supersedes:` |
-| a `Closes:` that changed nothing | a finding/action: hand edit its header to `CLOSED` (the `✓` line is already there). A decision / retired framing / note: `Supersedes: <it>` if that commit ended it, otherwise leave it |
+| a `Closes:` that changed nothing | a finding/action: hand edit its header to `CLOSED` (the `✓` line is already there). A decision / retired framing / note (a `✓` or `· not closed by` line): `Supersedes: <it>` if that commit ended it. Kept as it is: a body line `· tidied <date>: kept — <why>`, so the next tidy does not raise it again. A finding that was `CLOSED` once and put back by hand is never raised |
 | a settled fact, not a problem | hand edit: `OPEN` → `STANDING` in its header, plus a body line `· tidied <date>: a settled result, not an open problem` |
 | duplicate of a newer entry | `Supersedes: D-old by D-new` (the old one gains `⤳ superseded by D-new`) |
 | contradiction | ask the user which holds; the loser gets `Supersedes: … by …` — or, if the question is genuinely open again, a new `Opens:` |

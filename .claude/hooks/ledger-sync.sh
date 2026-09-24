@@ -7,8 +7,8 @@
 #   Decision: Finding: Opens: Fixed: Action: Retires:  -> a new entry (content-hash id)
 #   Closes: F-x          -> F-x (an open item, or a finding/action) becomes CLOSED, with a
 #                           `✓ closed by <sha>` line; a decision, retired framing or note never
-#                           closes — the gate refuses it, and the sync warns and leaves it
-#                           (close_refusal in _ledger_parse.py)
+#                           closes — the gate refuses it; past the gate, it gets a
+#                           `· not closed by <sha>` line, reported once (close_refusal)
 #   Supersedes: D-x      -> D-x becomes SUPERSEDED, with `⤳ superseded by <new id>`
 #   Refs: F-x, D-y       -> a `↔ <sha> <subject>` backlink on each
 #   Due: Owner: Area: Pin: Date:                 -> modifiers of the entry trailer above them
@@ -229,15 +229,20 @@ for kind, tid, sha, subject, extra in closes:
                               lambda l, h=sha: l.startswith(f'↔ {h}'))
     elif kind == 'Closes':
         # an open item or a finding/action closes; a decision, retired framing or note never
-        # does (close_refusal — the gate's own rule). A commit that got past the gate anyway is
-        # reported and left alone, unless an older sync already applied it.
+        # does (close_refusal — the gate's own rule). A commit that got past the gate anyway
+        # leaves `· not closed by <sha>` on the entry instead: the status is untouched, the
+        # attempt is on record for the tidy, and it is reported once — when that line is written.
         span = find_block(s, tid)
         blk = s[span[0]:span[1]] if span else ''
         hm = HDR.match(blk.split('\n', 1)[0])
         done = any(l.strip().startswith(f'✓ closed by {sha}') for l in blk.splitlines()[1:])
         why = close_refusal(hm.group(2), hm.group(3), tid) if hm and not done else ''
         if why:
-            sys.stderr.write(f'living-ledger: Closes {tid} in {sha} ignored — {why}\n')
+            before = s
+            s, _ = edit_block(s, tid, (), '', f'· not closed by {sha} {subj}'.rstrip(),
+                              lambda l, h=sha: l.startswith(f'· not closed by {h}'))
+            if s != before:
+                sys.stderr.write(f'living-ledger: Closes {tid} in {sha} ignored — {why}\n')
             continue
         s, found = edit_block(s, tid, ('OPEN', 'STANDING'), 'CLOSED',
                               f'✓ closed by {sha} {subj}'.rstrip(),

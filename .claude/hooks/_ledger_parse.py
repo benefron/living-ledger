@@ -958,20 +958,32 @@ def tidy_report(ledger, root, max_open=22):
             settled.append(line(e, f'born in a fix commit ({c})', 'CLOSED if the fix covers it'))
     section('Open, but possibly settled', settled)
 
-    # 1b. a `✓ closed by` line on an entry whose status that close never changed: a finding
-    # closed while it was STANDING (before Closes: acted on one), or a decision / retired
-    # framing / note, which Closes: never ends. A hand re-open to OPEN is not flagged.
+    # 1b. a close that changed nothing: a `✓ closed by` line on a finding still STANDING (closed
+    # before Closes: acted on one), or a `✓` / `· not closed by` line on a decision, retired
+    # framing or note, which Closes: never ends. Not flagged: a finding whose header was CLOSED
+    # at some point in the ledger's history (so it was put back by hand, on purpose), and an
+    # entry a tidy already kept (a `· tidied` line after the close).
+    in_git = os.path.relpath(ledger, root)
     noop = []
     for e in live:
-        c = next((l.split()[3] for l in e['lines'] if l.startswith('✓ closed by ')
-                  and len(l.split()) > 3), '')
-        if not c or e['status'] == 'OPEN':
+        c, at, kept = '', -1, -1
+        for n, l in enumerate(e['lines']):
+            m = re.match(r'(?:✓ closed|· not closed) by ([0-9a-f]{4,})\b', l)
+            if m:
+                c, at = m.group(1), n
+            elif l.startswith('· tidied'):
+                kept = n
+        if not c or kept > at:
             continue
         if e['type'] in ('finding', 'action'):
-            noop.append(line(e, f'closed in {c}, still {e["status"]}', 'CLOSED (hand-edit its header)'))
+            if e['status'] == 'STANDING' and not _git(
+                    root, 'log', '-1', '--format=%h', '-S', f"## {e['id']} · CLOSED ·", '--', in_git).strip():
+                noop.append(line(e, f'closed in {c}, still STANDING',
+                                 'CLOSED (hand-edit its header), or keep it with a `· tidied` line'))
         elif close_refusal(e['status'], e['type']):
             noop.append(line(e, f'a Closes: in {c} never changed it',
-                             f'Supersedes: {e["id"]} if that commit ended it; otherwise leave it'))
+                             f'Supersedes: {e["id"]} if that commit ended it; otherwise keep it '
+                             f'with a `· tidied` line'))
     section('A Closes: that changed nothing', noop)
 
     # 2. overdue and aging open items

@@ -9,6 +9,7 @@ keep it exact (`_ledger_parse.py lint <ledger>` reports any header that is not).
 · <modifier or Lore line>            (optional, any number)
 → <evidence: commit sha, file:line>
 ↔ / ✓ / ⤳ <sha> <subject>            (appended later by Refs:/Closes:/Supersedes:)
+· not closed by <sha> <subject>      (a Closes: the entry's type refuses — see below)
 ```
 
 The separator between header fields is ` · ` (space, U+00B7, space).
@@ -71,7 +72,9 @@ rejects a ledger line that sits outside that block instead of letting it be sile
 `Closes:` never touches a decision, a retired framing or a note — each changes only by
 `Supersedes:`, so the change carries its reason and a retired framing cannot leave the
 do-not-re-propose list unexplained. The `commit-msg` gate refuses `Closes:` on one and names
-`Supersedes:` / `Refs:`; a commit that skipped the gate is reported by the sync and left alone.
+`Supersedes:` / `Refs:`. A commit that skipped the gate leaves `· not closed by <sha> <subject>` on
+the entry and its status alone; the sync reports it once, when it writes that line, and the tidy
+report lists it.
 
 A rule in `.claude/rules/` is **stale** when it cites a `CLOSED` finding/action or any
 `SUPERSEDED` entry; a rule citing an in-force decision is not.

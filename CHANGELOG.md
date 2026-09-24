@@ -22,8 +22,10 @@ rewriting or renumbering any entry.
 - **`Closes:` by type.** `Closes:` on a STANDING finding now closes it (it used to add a `✓` line
   and leave it STANDING, so the digest kept showing it as established). A decision, a retired
   framing or a note is never closed: the gate refuses `Closes:` on one and names `Supersedes:` /
-  `Refs:`, and the sync reports a commit that skipped the gate and leaves the entry alone. The
-  tidy report lists entries an older sync left with a `✓` line and an unchanged status.
+  `Refs:`. A commit that skipped the gate leaves `· not closed by <sha>` on the entry, keeps its
+  status, and is reported once. The tidy report lists entries a close did not change (a `✓`
+  line from an older sync, or a `· not closed by` line); it skips a finding that was CLOSED
+  once and put back by hand, and anything a tidy kept with a `· tidied` line.
 
 ## v4 — 2026-09-23
 
