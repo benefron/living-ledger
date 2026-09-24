@@ -10,7 +10,7 @@ names, its extra sections) are never rewritten, only appended beside.
 
 Prints a one-line summary of what it added, or nothing.
 
-ledger-template-version: 5
+ledger-template-version: 6
 """
 import io
 import sys
@@ -47,7 +47,7 @@ def main():
         added.append('the three-levels-of-a-decision block')
 
     if head != orig:
-        io.open(ledger, 'w', encoding='utf-8').write(head + sep + tail)
+        io.open(ledger, 'w', encoding='utf-8', newline='\n').write(head + sep + tail)
         print('added ' + ', '.join(added))
 
 

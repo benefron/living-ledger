@@ -9,7 +9,7 @@ bash tests/run_tests.sh      # end to end, in throwaway repos; never touches you
 python3 tests/test_merge.py  # the merge driver
 ```
 
-Both must pass (CI runs them on macOS and Linux).
+Both must pass (CI runs them on macOS and Linux). Windows isn't in CI; if you use the ledger there, reports are especially welcome.
 
 - **Every commit carries a ledger trailer** — this repository keeps its own ledger, so the
   `commit-msg` gate applies here too. `Decision:`, `Finding:`, `Opens:`, `Fixed:` … or

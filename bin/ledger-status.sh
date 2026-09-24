@@ -12,7 +12,7 @@
 # so nothing in any working tree is ever modified. `--sync` is accepted and ignored (v3 used
 # it to write those entries into each repo; v4 never writes outside a commit).
 #
-# ledger-template-version: 5
+# ledger-template-version: 6
 set -uo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -65,8 +65,8 @@ if [ -f "$PATHS" ]; then
       echo "gone: $id — $path (not on this machine or deleted)" >&2
       continue
     fi
-    if [ -x "$path/.claude/hooks/ledger-rollup.sh" ]; then
-      CLAUDE_PROJECT_DIR="$path" "$path/.claude/hooks/ledger-rollup.sh" >/dev/null 2>&1 || true
+    if [ -f "$path/.claude/hooks/ledger-rollup.sh" ]; then
+      CLAUDE_PROJECT_DIR="$path" bash "$path/.claude/hooks/ledger-rollup.sh" >/dev/null 2>&1 || true
     fi
   done < "$PATHS"
 fi

@@ -5,6 +5,24 @@ running an older template is flagged at session start with `LEDGER UPGRADE AVAIL
 `/ledger-init --upgrade` (or `install.sh <repo> --upgrade`) upgrades it in one commit without
 rewriting or renumbering any entry.
 
+## Unreleased (template v6)
+
+Found by running v5 on a Windows lab PC and pulling its repositories on a Mac.
+
+- **Hooks no longer depend on the executable bit.** Git on Windows ignores it, so scripts a
+  Windows checkout committed were non-executable. On macOS and Linux clones, the shim skipped a
+  hook it could not execute, and so did the settings hooks and the digest's own calls — silently:
+  no commit gate, no sync, no recall. Every hook now runs through `bash`. Existing shims (marked
+  v2 from now on) are rewritten at the next session, and an install rewrites old hook commands
+  in `.claude/settings.json`.
+- **An upgrade commits its scripts as executable wherever it runs.** It commits from a temporary
+  index with the bit set; `git commit -- <paths>` took the mode from the filesystem. A fresh
+  install stages its scripts as executable.
+- **Unix line endings on every platform.** Python on Windows wrote the ledger, the decisions log,
+  the merge driver's output and `settings.json` with CRLF; every write is now LF, and a CRLF
+  ledger is written back as LF.
+- The upgrade notice lists what every version since the repo's own added, not only the newest.
+
 ## v5 — 2026-09-24
 
 Recall: the part of the ledger the session digest leaves out now reaches Claude when a message

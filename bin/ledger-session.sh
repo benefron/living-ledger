@@ -11,7 +11,7 @@
 #
 # Silent in headless runs, outside git repos, and whenever there is nothing to say.
 #
-# ledger-template-version: 5
+# ledger-template-version: 6
 set -uo pipefail
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null
@@ -48,6 +48,6 @@ case "$V" in
     SV="$(ll_skill_version)"
     [ -n "$SV" ] || exit 0
     case "$V" in 0) OLD="v0 (hooks missing)" ;; unknown) OLD="an unstamped template" ;; *) OLD="v$V" ;; esac
-    emit "LEDGER UPGRADE AVAILABLE: this repo runs ledger template $OLD; v$SV is installed on this machine — run \`/ledger-init --upgrade\` before the first commit of the session (adds: $(ll_version_changes "$SV"))." ;;
+    emit "LEDGER UPGRADE AVAILABLE: this repo runs ledger template $OLD; v$SV is installed on this machine — run \`/ledger-init --upgrade\` before the first commit of the session (adds — $(ll_changes_since "$V" "$SV"))." ;;
 esac
 exit 0

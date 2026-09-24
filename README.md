@@ -38,8 +38,10 @@ glance), `/ledger-note` (record something right now), `/ledger-tidy`.
 
 ## Install
 
-Requires git, python3 (3.8+), bash and [Claude Code](https://code.claude.com); macOS and Linux
-(CI runs both — Windows is untested, WSL should behave like Linux).
+Requires git, python3 (3.8+), bash and [Claude Code](https://code.claude.com). CI runs macOS and
+Linux. On Windows it runs under Git for Windows, whose bash runs the hooks; two of the
+repositories in the [field notes](#field-notes) are worked from a Windows lab PC, but Windows is
+not in CI. There, `python3` has to be on the PATH (some installs only provide `python`).
 
 ```bash
 git clone https://github.com/benefron/living-ledger ~/.claude/skills/living-ledger
@@ -291,7 +293,8 @@ Environment: `LEDGER_SKIP=1` (skip the gate and sync for one command), `LEDGER_D
   recorded twice (once planned, once enacted), dilute the digest. The vocabulary (`Finding:` vs
   `Opens:`, `Refs:` for enactment, `Supersedes:`) prevents most of it; `/ledger-tidy` folds the
   rest, and says when it is due.
-- The digest is capped (~2–3k tokens); older material is grep-only by design.
+- The digest is capped (~2–3k tokens). Older entries reach a session through recall, when a
+  message touches them, or through `ledger search`; they are never all loaded at once.
 
 ## Field notes
 
@@ -307,6 +310,20 @@ fixes id collisions between parallel branches and machines, trailers silently dr
 wrapped, "open" lists full of settled facts, auto-sync failing when `DECISIONS.md` was
 gitignored, `core.hooksPath` silently disabling Git LFS, and the digest leaking into headless
 pipeline calls. See [`CHANGELOG.md`](CHANGELOG.md) and this repo's own [`LEDGER.md`](LEDGER.md).
+
+**On Windows.** Two of the six repositories, a hardware controller and a lab-experiment protocol,
+are worked from a Windows lab PC. Between them they have 237 commits since the ledger went in
+(9 and 14 September), 123 of them carrying ledger records, and 240 entries. The v1 digest and
+sync ran there through September. On 24 September the upgrade to v5 ran there too: the upgrade
+commit, a merge through the ledger's merge driver, and the post-commit sync's automatic commit.
+Windows also exposed two bugs, both fixed in v6:
+- Git on Windows ignores the executable bit, so the upgrade committed its new scripts
+  non-executable. On a Mac clone of those repositories, the shim that runs the commit gate
+  skipped a hook it could not execute, and did so silently. Hooks now run through `bash`, so the
+  bit no longer matters, and an upgrade commits its scripts as executable wherever it runs.
+- Python on Windows writes Windows line endings unless told not to, so the merge driver and the
+  sync turned one ledger CRLF, and the next sync on a Mac would have rewritten every line. Every
+  file is now written with Unix line endings.
 
 ## Development
 

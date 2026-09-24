@@ -15,15 +15,20 @@
 # lives, whether to backfill) are made by the /ledger-init command before it calls
 # this script with the flags decided.
 #
-# ledger-template-version: 5
+# ledger-template-version: 6
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TPL="$SKILL_DIR/templates"
 COMMANDS_SRC="$SKILL_DIR/commands"
 QUIET=0
-LL_TEMPLATE_VERSION=5
+LL_TEMPLATE_VERSION=6
 say() { [ "$QUIET" = 1 ] || printf '%s\n' "$*"; }
+# the scripts a repo carries that git must record as executable (100755)
+LL_EXEC_FILES=".claude/hooks/digest.sh .claude/hooks/ledger-recall.sh .claude/hooks/ledger-sync.sh
+.claude/hooks/ledger-rollup.sh .claude/hooks/ledger-index-push.sh .claude/hooks/ledger-merge.py
+.claude/hooks/ledger-activate.sh .claude/hooks/ledger .githooks/commit-msg .githooks/post-commit
+.githooks/post-merge"
 warn() { printf '%s\n' "$*" >&2; }      # never silenced by --quiet
 
 # shellcheck source=/dev/null
@@ -70,16 +75,16 @@ ss = cfg.setdefault("hooks", {}).setdefault("SessionStart", [])
 for blk in ss:
     for h in blk.get("hooks", []):
         if "ledger-session.sh" in h.get("command", ""):
-            h["command"] = '"%s"' % script
+            h["command"] = 'bash "%s"' % script
             break
     else:
         continue
     break
 else:
-    ss.append({"matcher": "startup", "hooks": [{"type": "command", "command": '"%s"' % script,
+    ss.append({"matcher": "startup", "hooks": [{"type": "command", "command": 'bash "%s"' % script,
                                                 "timeout": 10}]})
-json.dump(cfg, open(p, "w"), indent=2)
-open(p, "a").write("\n")
+json.dump(cfg, open(p, "w", newline="\n"), indent=2)
+open(p, "a", newline="\n").write("\n")
 PYG
 }
 
@@ -97,11 +102,12 @@ try:
         raise ValueError
 except Exception:
     print("!! settings.json is not valid JSON — add these SessionStart hooks by hand:")
-    print('   sh -c \'D="${CLAUDE_PROJECT_DIR:-.}"; "$D/.claude/hooks/digest.sh"\'')
+    print('   sh -c \'D="${CLAUDE_PROJECT_DIR:-.}"; bash "$D/.claude/hooks/digest.sh"\'')
     sys.exit(0)
 
 def cmd(script):
-    return 'sh -c \'D="${CLAUDE_PROJECT_DIR:-.}"; "$D/.claude/hooks/%s"\'' % script
+    # through bash: a checkout that lost the executable bit (a repo committed from Windows) still runs
+    return 'sh -c \'D="${CLAUDE_PROJECT_DIR:-.}"; bash "$D/.claude/hooks/%s"\'' % script
 
 CMD = cmd("digest.sh")
 PUSH = cmd("ledger-index-push.sh")
@@ -122,6 +128,14 @@ def has(blocks, matcher, needle):
     return False
 
 added = 0
+# hooks written by template v5 and earlier ran the script directly, which needs its executable bit
+for blocks in hooks.values():
+    for blk in blocks if isinstance(blocks, list) else []:
+        for h in blk.get("hooks", []):
+            c = h.get("command", "")
+            if '; "$D/.claude/hooks/' in c:
+                h["command"] = c.replace('; "$D/.claude/hooks/', '; bash "$D/.claude/hooks/')
+                added += 1
 for matcher, msg in want:
     if has(ss, matcher, "digest.sh"):
         continue
@@ -143,8 +157,8 @@ if not has(se, None, "ledger-index-push.sh"):
          "statusMessage": "Pushing ledger index…"}]})
     added += 1
 
-json.dump(cfg, open(p, "w"), indent=2)
-open(p, "a").write("\n")
+json.dump(cfg, open(p, "w", newline="\n"), indent=2)
+open(p, "a", newline="\n").write("\n")
 if sys.argv[2] != "1":
     print(f"· settings.json -> SessionStart, UserPromptSubmit, SessionEnd hooks ({'added '+str(added) if added else 'already present'})")
 PY
@@ -393,7 +407,7 @@ print(",".join(sorted(p for p, n in c.items() if n >= 3)))
 
   # 6. register in the cross-repo index
   install_global >/dev/null
-  CLAUDE_PROJECT_DIR="$repo" "$repo/.claude/hooks/ledger-rollup.sh" >/dev/null 2>&1 || true
+  CLAUDE_PROJECT_DIR="$repo" bash "$repo/.claude/hooks/ledger-rollup.sh" >/dev/null 2>&1 || true
   say "· registered  -> $(ll_ledger_home)/repos/$repo_id.md"
 
   # 7. backfill availability
@@ -405,29 +419,46 @@ print(",".join(sorted(p for p, n in c.items() if n >= 3)))
       say "  entries from them (none / light / aggressive)."
     fi
   fi
+  # 7b. executable bits. Where git ignores the filesystem's bit (Windows: core.fileMode=false) a
+  #     new file is committed as 100644, and a macOS/Linux clone then cannot run it directly. A
+  #     fresh install stages its scripts as executable (the init commit keeps that); an upgrade
+  #     sets them in the index it commits from, below.
+  local -a exe=(); local x
+  for x in $LL_EXEC_FILES; do [ -f "$repo/$x" ] && exe+=("$x"); done
+  if [ "$upgrade" != 1 ] && [ "${#exe[@]}" -gt 0 ]; then
+    git -C "$repo" add -- "${exe[@]}" 2>/dev/null && \
+      git -C "$repo" update-index --chmod=+x -- "${exe[@]}" 2>/dev/null || true
+  fi
+
   # 8. --upgrade: commit the upgrade. Plumbing, so `Ledger: none` — a template bump is not a
   #    project decision and must not take a "recently decided" slot in the digest.
   if [ "$upgrade" = 1 ]; then
     local wv="$was_version"
     case "$wv" in 0) wv="0 (no ledger.conf — pre-hook install)" ;; esac
     # derive what the history holds first, so the upgrade is ONE commit that leaves nothing
-    CLAUDE_PROJECT_DIR="$repo" "$repo/.claude/hooks/ledger-sync.sh" >/dev/null 2>&1 || true
+    CLAUDE_PROJECT_DIR="$repo" bash "$repo/.claude/hooks/ledger-sync.sh" >/dev/null 2>&1 || true
     if [ -n "$(git -C "$repo" status --porcelain 2>/dev/null)" ]; then
-      # commit ONLY what the upgrade touched — never work the user already had staged
-      local pth; local -a paths=()
+      # commit ONLY what the upgrade touched — never work the user already had staged. It is
+      # built in a temporary index: `git commit -- <paths>` would take the modes from the
+      # filesystem, and where git ignores that (Windows) the scripts would lose their exec bit.
+      local pth tmpidx; local -a paths=()
+      tmpidx="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/ll-idx-$$")"; rm -f "$tmpidx"
+      GIT_INDEX_FILE="$tmpidx" git -C "$repo" read-tree HEAD 2>/dev/null
       for pth in .claude .githooks .gitattributes .gitignore "$ledger_rel" "$dec_rel"; do
         [ -n "$pth" ] || continue
         if [ -e "$repo/$pth" ] || git -C "$repo" ls-files --error-unmatch -- "$pth" >/dev/null 2>&1; then
-          git -C "$repo" add -A -- "$pth" 2>/dev/null || true
+          GIT_INDEX_FILE="$tmpidx" git -C "$repo" add -A -- "$pth" 2>/dev/null || true
           paths+=("$pth")
         fi
       done
-      LEDGER_SYNC_IN_PROGRESS=1 git -C "$repo" commit --no-verify -q \
+      [ "${#exe[@]}" -gt 0 ] && GIT_INDEX_FILE="$tmpidx" git -C "$repo" update-index --chmod=+x -- "${exe[@]}" 2>/dev/null
+      LEDGER_SYNC_IN_PROGRESS=1 GIT_INDEX_FILE="$tmpidx" git -C "$repo" commit --no-verify -q \
         -m "chore: upgrade living ledger to template v$LL_TEMPLATE_VERSION" \
         -m "v$wv -> v$LL_TEMPLATE_VERSION: $(ll_version_changes "$LL_TEMPLATE_VERSION")." \
         -m "Ledger: none — living-ledger template upgrade, tooling only" \
-        -- "${paths[@]}" \
         && say "· upgraded    -> committed (v$wv -> v$LL_TEMPLATE_VERSION)"
+      rm -f "$tmpidx"
+      git -C "$repo" reset -q -- "${paths[@]}" 2>/dev/null || true   # the real index follows HEAD there
     else
       say "· upgraded    -> already at v$LL_TEMPLATE_VERSION, nothing to commit"
     fi

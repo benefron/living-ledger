@@ -38,7 +38,7 @@ hc() { local r="$1"; shift; ( cd "$r" && git commit -q --allow-empty "$@" ) >"$W
 sync_() { CLAUDE_PROJECT_DIR="$1" "$1/.claude/hooks/ledger-sync.sh" 2>"$WORK/syncerr"; }
 hdrs() { sed -n '/ENTRIES_START/,$p' "$1/LEDGER.md" | grep '^## '; }
 hid() { python3 "$SKILL/templates/hooks/_ledger_parse.py" id "$1" "$2"; }
-digest() { CLAUDE_PROJECT_DIR="$1" "$1/.claude/hooks/digest.sh" 2>/dev/null | python3 -c \
+digest() { CLAUDE_PROJECT_DIR="$1" bash "$1/.claude/hooks/digest.sh" 2>/dev/null | python3 -c \
   'import json,sys; t=sys.stdin.read(); print(json.loads(t)["hookSpecificOutput"]["additionalContext"] if t.strip() else "")'; }
 installed() { "$INSTALL" "$1" --quiet "${@:2}"; git -C "$1" add -A; commit "$1" "chore: install
 Ledger: none — installing the ledger tooling"; }
@@ -59,7 +59,7 @@ check "merge driver registered"       "git -C '$R' config --get merge.ledger.dri
 check "settings.json valid, has digest" "python3 -c 'import json;d=json.load(open(\"$R/.claude/settings.json\"));assert \"digest.sh\" in json.dumps(d)'"
 check "registered in the index"       "ls '$LL_HOME_DIR'/ledger/repos/*.md >/dev/null 2>&1"
 check "user-level session hook added" "grep -q 'ledger-session.sh' '$LL_HOME_DIR/settings.json'"
-check "every stamp is v5" "! grep -rl 'ledger-template-version: [0-46-9]' '$R/.claude' '$R/.githooks' >/dev/null"
+check "every stamp is v6" "! grep -rl 'ledger-template-version: [0-57-9]' '$R/.claude' '$R/.githooks' >/dev/null"
 git -C "$R" add -A; commit "$R" "chore: install
 Ledger: none — installing the ledger tooling"
 
@@ -377,7 +377,7 @@ C2="$WORK/clone2"; git clone -q "$B" "$C2"; cp "$SKILL/templates/LEDGER.md" "$C2
 check "a fresh clone derives identical ids" "[ \"\$(hdrs '$C2' | cut -d' ' -f2 | sort)\" = \"\$(hdrs '$B' | cut -d' ' -f2 | sort)\" ]"
 
 # ---------------------------------------------------------------------------
-echo "12. upgrades: v1 marker and v3 bookmark -> v5, nothing lost"
+echo "12. upgrades: v1 marker and v3 bookmark -> v6, nothing lost"
 U1="$(newrepo v1)"
 commit "$U1" "feat: old
 
@@ -418,7 +418,7 @@ U3="$(newrepo v3)"; installed "$U3"
 echo 'AUDIENCE_SURFACE=paper/main.tex' >> "$U3/.claude/ledger.conf"
 sed -i.bak '/^SYNC_FROM=/d' "$U3/.claude/ledger.conf"; rm -f "$U3/.claude/ledger.conf.bak"
 git -C "$U3" rev-parse --short HEAD > "$U3/.claude/.ledger-sync"
-perl -pi -e 's/ledger-template-version: 5/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
+perl -pi -e 's/ledger-template-version: 6/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
 git -C "$U3" add -A; commit "$U3" "x
 Ledger: none — simulate a v3 install"
 "$INSTALL" "$U3" --upgrade --quiet
@@ -433,12 +433,12 @@ python3 - "$U4/.claude/settings.json" <<'PYX'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p)); d['hooks'].pop('UserPromptSubmit', None); json.dump(d, open(p, 'w'))
 PYX
-perl -pi -e 's/ledger-template-version: 5/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
+perl -pi -e 's/ledger-template-version: 6/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
 git -C "$U4" add -A; commit "$U4" "x
 Ledger: none — simulate a v4 install"
 check "v4 repo: the digest offers the upgrade, naming recall" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE.*prompt-time recall'"
 "$INSTALL" "$U4" --upgrade --quiet
-check "v4 -> v5: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
+check "v4 -> v6: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
 
 DL="$(newrepo dotted)"; installed "$DL"
 python3 - "$DL/DECISIONS.md" <<'PYX'
@@ -778,6 +778,44 @@ printf 'RECALL_MIN=2.25\n' >> "$CR/.claude/ledger.conf"; git -C "$CR" add -A; co
 Decision: recall threshold 2.0 -> 2.25
 Tidy: recall calibrated"
 check "a committed change restarts the count" "( cd '$CR' && .claude/hooks/ledger recall-stats ) | grep -q '0 so far'"
+
+# ---------------------------------------------------------------------------
+echo "13j. a checkout that lost the executable bit, or has CRLF (a repo committed from Windows)"
+WX="$(newrepo winexec)"; installed "$WX"
+check "settings.json runs every hook through bash" "python3 -c 'import json,sys; d=json.load(open(\"$WX/.claude/settings.json\")); cs=[h[\"command\"] for bs in d[\"hooks\"].values() for b in bs for h in b[\"hooks\"]]; sys.exit(0 if cs and all(\"bash \\\"\$D/.claude/hooks/\" in c for c in cs) else 1)'"
+chmod -x "$WX"/.claude/hooks/* "$WX"/.githooks/*
+hc "$WX" -m "wip"
+check "no exec bit: the commit gate still refuses a commit with no trailer" "grep -q 'REJECTED' '$WORK/err'"
+hc "$WX" -m "feat: x" -m "Decision: the gate runs even when the hooks lost their executable bit"
+check "no exec bit: the post-commit sync still records and commits" "ghas 'the gate runs even when' -C '$WX' show HEAD -- LEDGER.md && ghas 'chore: ledger sync' -C '$WX' log -1 --format=%s"
+check "no exec bit: the recall hook runs from its settings command" "echo '{\"session_id\":\"x\",\"prompt\":\"does the gate run when hooks lost the executable bit?\"}' | CLAUDE_PROJECT_DIR='$WX' sh -c 'D=\"\${CLAUDE_PROJECT_DIR:-.}\"; bash \"\$D/.claude/hooks/ledger-recall.sh\"' 2>'$WORK/rerr' | grep -q UserPromptSubmit; [ ! -s '$WORK/rerr' ]"
+printf '#!/bin/sh\n# living-ledger shim: runs the repo committed .githooks/commit-msg.\nT="$(git rev-parse --show-toplevel)/.githooks/commit-msg"\n[ -x "$T" ] && exec "$T" "$@"\nexit 0\n' > "$WX/.git/hooks/commit-msg"
+digest "$WX" >/dev/null
+check "an older shim is rewritten in place at the next session, not kept as .pre-ledger" "grep -q 'living-ledger shim v2' '$WX/.git/hooks/commit-msg' && [ ! -e '$WX/.git/hooks/commit-msg.pre-ledger' ]"
+OLDSET='{"hooks":{"SessionStart":[{"matcher":"startup|resume|clear","hooks":[{"type":"command","command":"sh -c '"'"'D=\"${CLAUDE_PROJECT_DIR:-.}\"; \"$D/.claude/hooks/digest.sh\"'"'"'","timeout":20}]}]}}'
+printf '%s\n' "$OLDSET" > "$WX/.claude/settings.json"; "$INSTALL" "$WX" --quiet
+check "an install rewrites hook commands that ran scripts directly" "python3 -c 'import json,sys; d=json.load(open(\"$WX/.claude/settings.json\")); cs=[h[\"command\"] for bs in d[\"hooks\"].values() for b in bs for h in b[\"hooks\"]]; sys.exit(0 if all(\"bash \\\"\$D/.claude/hooks/\" in c for c in cs) and sum(\"digest.sh\" in c for c in cs) == 2 else 1)'"
+
+FM="$(newrepo filemode)"; git -C "$FM" config core.fileMode false
+"$INSTALL" "$FM" --quiet; git -C "$FM" add -A; commit "$FM" "chore: install
+Ledger: none — installing the ledger tooling"
+check "git ignoring exec bits (Windows): a fresh install still commits its scripts as 100755" "[ -z \"\$(git -C '$FM' ls-tree -r HEAD -- .claude/hooks .githooks | grep -v '_ledger_' | grep -v '^100755')\" ]"
+git -C "$FM" rm -q --cached .claude/hooks/ledger-recall.sh; rm -f "$FM/.claude/hooks/ledger-recall.sh"
+perl -pi -e 's/ledger-template-version: 6/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
+git -C "$FM" add -A; commit "$FM" "x
+Ledger: none — simulate a v5 install"
+printf 'mine\n' > "$FM/user.txt"; git -C "$FM" add user.txt
+"$INSTALL" "$FM" --upgrade --quiet
+check "…and an upgrade there commits a new script as 100755" "git -C '$FM' ls-tree HEAD .claude/hooks/ledger-recall.sh | grep -q '^100755'"
+check "…without committing what the user had staged" "! git -C '$FM' show --name-only --format= HEAD | grep -qx user.txt && git -C '$FM' diff --cached --name-only | grep -qx user.txt"
+
+CR="$(newrepo crlf)"; installed "$CR"
+hc "$CR" -m "feat: a" -m "Decision: the vendor API is polled every ten seconds"
+python3 -c "import sys; p=sys.argv[1]; d=open(p,'rb').read().replace(b'\r\n',b'\n').replace(b'\n',b'\r\n'); open(p,'wb').write(d)" "$CR/LEDGER.md"
+git -C "$CR" add LEDGER.md; commit "$CR" "x
+Ledger: none — simulate a ledger written with CRLF line endings"
+hc "$CR" -m "feat: b" -m "Decision: exports are written as parquet files"
+check "a CRLF ledger is written back with LF, entries intact" "! grep -q \$'\\r' '$CR/LEDGER.md' && grep -q 'polled every ten seconds' '$CR/LEDGER.md' && grep -q 'written as parquet files' '$CR/LEDGER.md'"
 
 # ---------------------------------------------------------------------------
 echo "14. the user-level session hook"
