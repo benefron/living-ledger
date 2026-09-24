@@ -128,6 +128,12 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-7269818 · CLOSED · decision · - · 2026-09-24
+a Closes: trailer resolves an open item or a finding, including one recorded as a fact; a decision, a retired framing or a note is never closed — the gate refuses it and points to Supersedes: or Refs:
+· Rejected: Closes: flips every STANDING entry to CLOSED | closing a retired framing would drop it from the do-not-re-propose list without the Decision + Supersedes that D-be290b3 requires
+· Rejected: the gate refuses Closes: on any STANDING entry | a fixed problem recorded as Finding: would have no honest path; Supersedes says replaced, not resolved
+→ commit d1d6187
+
 ## D-add0c44 · CLOSED · decision · recall · 2026-09-24
 each message the user types is matched against the whole ledger, and up to three entries the session digest did not show are put in front of Claude when they score at least RECALL_MIN (2.0)
 → commit 58f67cc
@@ -142,9 +148,10 @@ replayed on 167 real messages, recall at RECALL_MIN 2.0 fired on 13% of them and
 · Rejected: a plan-time ledger check on ExitPlanMode | in 19 real plans every strong hit was already cited by the plan
 → commit 58f67cc
 
-## F-e118b73 · OPEN · finding · recall · 2026-09-24
+## F-e118b73 · CLOSED · finding · recall · 2026-09-24
 a Closes: trailer on a STANDING finding adds a closed line but leaves the entry STANDING, so the digest keeps showing a fact the user closed
 → commit 58f67cc
+✓ closed by d1d6187 fix: Closes: closes a STANDING finding, never a decision, retired framing or note
 
 ## D-14aa29c · CLOSED · decision · cli · 2026-09-24
 `ledger search <words>` ranks every ledger entry, including retired and superseded ones, by BM25 over its text and annotations
@@ -179,6 +186,7 @@ the commit gate refuses a Decision that re-adopts a rejected alternative or a re
 · Rejected: an interactive commit builder like the paper's lore commit | Claude writes the message, and /ledger-note covers records without code
 · Rejected: requiring the subject line to state intent, as Lore does | it clashes with Conventional Commits, which most repos already follow
 → commit aaa8b3c
+↔ d1d6187 fix: Closes: closes a STANDING finding, never a decision, retired framing or note
 
 ## F-4e76afb · CLOSED · finding · bin · 2026-09-23
 /ledger-status left v1-v2 repos out of the 'Behind template' list and padded it with blank lines
@@ -279,6 +287,7 @@ the commit gate is a git commit-msg hook that calls the sync's own trailer reade
 ## D-3c1386a · CLOSED · decision · - · 2026-09-23
 Finding: records a settled fact (STANDING); only Opens: and Action: create open items
 → commit 9d9fbe4
+↔ d1d6187 fix: Closes: closes a STANDING finding, never a decision, retired framing or note
 
 ## D-6452a38 · CLOSED · decision · - · 2026-09-23
 committed git hooks are activated as per-clone shims in the hooks dir that keep existing hooks; core.hooksPath is never set
