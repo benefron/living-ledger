@@ -40,4 +40,4 @@ paths:
   instruction to future modifiers. A recurring `Directive:` about one area belongs here
   as a rule.
 
-<!-- ledger-template-version: 4 -->
+<!-- ledger-template-version: 5 -->

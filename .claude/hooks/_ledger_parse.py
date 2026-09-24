@@ -34,7 +34,7 @@ Copied verbatim into each repo as .claude/hooks/_ledger_parse.py. Entrypoints:
     _ledger_parse.py cli <repo_root> <command> [args]     (what `.claude/hooks/ledger` runs)
         -> the query side of the Lore protocol over this repo, for any agent or person:
            context|directives|constraints|rejected <path>, open, decisions, retired,
-           stale, validate, rules, tidy, share, search. `ledger help` lists them.
+           stale, validate, rules, tidy, share, search, recall-stats. `ledger help` lists them.
 
     _ledger_parse.py check-msg <commit-msg-file> <repo_root>
         -> the commit gate (called by .githooks/commit-msg): exit 1 with the reason on stderr
@@ -46,7 +46,7 @@ every clone and branch, so two machines or two branches can never hand out one i
 rebase or squash-merge leaves the id intact. Legacy sequential ids (`F-014`) are still parsed
 everywhere and never renumbered.
 
-ledger-template-version: 4
+ledger-template-version: 5
 """
 import datetime
 import hashlib
@@ -379,6 +379,9 @@ def cmd_digest(argv):
                "`Ledger: none — <reason>`. A decision with no file change is an empty commit "
                "(`git commit --allow-empty --only`).")
     out.append("If something above looks wrong or stale, say so — do not silently work around it.")
+    if os.environ.get('LL_SESSION') and os.environ.get('LL_ROOT'):
+        shown = openi[:max_open] + pinned[:12] + recent + retire[:16]
+        write_seen(os.environ['LL_ROOT'], os.environ['LL_SESSION'], [e['id'] for e in shown])
     return "\n".join(out)
 
 
@@ -1030,7 +1033,14 @@ def tidy_report(ledger, root, max_open=22):
 
     if len(out) <= 4:
         out.append("Nothing to tidy.")
-    return "\n".join(out)
+        out.append('')
+
+    # 9. prompt-time recall: is its threshold letting through what gets used?
+    rec = recall_report(root)
+    if rec:
+        out.append("## Recall threshold (calibration)")
+        out.extend(rec)
+    return "\n".join(out).rstrip()
 
 
 def cmd_tidy_report(argv):
@@ -1340,6 +1350,7 @@ CLI_HELP = """ledger — query this repo's ledger and the decision history in it
   ledger validate [N]         check the last N commits against the ledger's commit rules (20)
   ledger rules                regenerate .claude/rules/ledger/ from directives/constraints/rejected
   ledger tidy                 the tidy report      ledger share   records not shared yet
+  ledger recall-stats         how prompt-time recall is doing, and whether its threshold should move
 
 Works for any agent or person that can run a shell command. Writing happens only through
 commit trailers (Decision:, Finding:, Opens:, … — see the ledger's own header)."""
@@ -1388,6 +1399,8 @@ def cmd_cli(argv):
         return tidy_report(ledger, root)
     if cmd == 'share':
         return "\n".join(share_lines(root)) or "Everything is shared."
+    if cmd == 'recall-stats':
+        return cmd_recall_stats([root])
     return f"unknown command: {cmd}\n\n{CLI_HELP}"
 
 
@@ -1469,6 +1482,287 @@ def _status_line(e):
     return f"{e['id']} · {e['status']}{extra} · {e['type']} · {e['date']}"
 
 
+# --- recall: at each prompt, the entries it touches that the session digest did not show ------
+# The digest shows what is open, pinned and recent; the rest of the ledger is reachable only by
+# search. A UserPromptSubmit hook runs `recall` on every message the user types: ids it names
+# are resolved, and the best-matching entries over RECALL_MIN are shown (at most RECALL_MAX, each
+# once per session). Scores are BM25 / sqrt(query terms), so a long pasted report does not
+# out-score a short question. The starting threshold, 2.0, comes from replaying 167 real
+# messages: it fired on 13% of them, 81% of what it showed was judged relevant.
+# Every recall is logged in the clone's git dir (never committed); /ledger-tidy reads the
+# sessions back to see which recalls were used, and proposes moving the threshold.
+
+RECALL_CHAT = set(
+    'give run need come mean call another again make sure okay please thing way also just like '
+    'maybe sound right good try done now one two time still well first next much many point '
+    'issue problem question work check help part case kind lot bit fine said say tell'.split())
+RECALL_MIN_DEFAULT, RECALL_MAX_DEFAULT = 2.0, 3
+RECALL_MIN_SAMPLES = 30          # recalls since the last calibration before proposing a change
+RECALL_STEP, RECALL_FLOOR, RECALL_CEIL = 0.25, 1.5, 3.5
+
+
+def recall_settings(root):
+    def num(key, default):
+        try:
+            return float(_conf(root, key).strip('"\'') or default)
+        except ValueError:
+            return default
+    on = _conf(root, 'RECALL').strip('"\'').lower() not in ('off', 'no', '0', 'false')
+    return on, num('RECALL_MIN', RECALL_MIN_DEFAULT), int(num('RECALL_MAX', RECALL_MAX_DEFAULT))
+
+
+def recall_dir(root):
+    """Per-clone recall state, shared by the clone's worktrees; never committed."""
+    d = _git(root, 'rev-parse', '--git-common-dir').strip()
+    if not d:
+        return ''
+    return os.path.join(root, d, 'ledger-recall') if not os.path.isabs(d) else os.path.join(d, 'ledger-recall')
+
+
+def _seen_path(root, session):
+    session = re.sub(r'[^A-Za-z0-9_-]', '', session or '')[:64]
+    d = recall_dir(root)
+    return os.path.join(d, f'seen-{session}.txt') if session and d else ''
+
+
+def _read_seen(path):
+    try:
+        return set(io.open(path, encoding='utf-8').read().split())
+    except OSError:
+        return set()
+
+
+def write_seen(root, session, ids, append=False):
+    """The ids this session already has in context: the digest's (rewritten at every session
+    start and after compaction) plus what recall showed since."""
+    path = _seen_path(root, session)
+    if not path:
+        return
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with io.open(path, 'a' if append else 'w', encoding='utf-8') as f:
+            f.write(''.join(i + '\n' for i in ids))
+        if not append:                   # prune other sessions' files after two weeks
+            cutoff = datetime.datetime.now().timestamp() - 14 * 86400
+            for n in os.listdir(os.path.dirname(path)):
+                p = os.path.join(os.path.dirname(path), n)
+                if n.startswith('seen-') and os.path.getmtime(p) < cutoff:
+                    os.remove(p)
+    except OSError:
+        pass
+
+
+def recall(entries, prompt, seen=(), min_score=RECALL_MIN_DEFAULT, k=RECALL_MAX_DEFAULT):
+    """-> (named, shown, near). named: entries whose id the prompt names; shown: [(score, e)] at
+    or over min_score with at least two content words matched; near: up to 3 just under it
+    (within 0.5), logged for calibration but not shown."""
+    import math
+    by_id = {e['id']: e for e in entries}
+    named = [by_id[i] for i in dict.fromkeys(ID_RE.findall(prompt)) if i in by_id and i not in seen]
+    text = prompt.strip()
+    if len(text.split()) < 4 or text[:1] in ('/', '<'):
+        return named, [], []
+    q = list(dict.fromkeys(_terms(text)))
+    scale = math.sqrt(max(len(q), 1))
+    skip = set(seen) | {e['id'] for e in named}
+    shown, near = [], []
+    for score, e, matched in search(entries, text, k=15, exclude=skip, min_terms=2):
+        if len([t for t in matched if t not in RECALL_CHAT]) < 2:
+            continue
+        s = round(score / scale, 2)
+        if s >= min_score:
+            if len(shown) < k:
+                shown.append((s, e))
+        elif s >= min_score - 0.5 and len(near) < 3:
+            near.append((s, e))
+    return named, shown, near
+
+
+def recall_text(named, shown):
+    if not (named or shown):
+        return ''
+    out = ["Ledger recall — entries this message touches that the session digest did not show. "
+           "If one shapes your answer, cite its id; if none bears on it, ignore them."]
+    out += [f"- {_status_line(e)} — {entry_text(e)[:220]}" for e in named]
+    out += [f"- {_status_line(e)} — {entry_text(e)[:220]}" for _, e in shown]
+    return "\n".join(out)
+
+
+def _log_recall(root, rows):
+    d = recall_dir(root)
+    if not d or not rows:
+        return
+    try:
+        os.makedirs(d, exist_ok=True)
+        path = os.path.join(d, 'log.tsv')
+        with io.open(path, 'a', encoding='utf-8') as f:
+            f.write(''.join('\t'.join(str(c) for c in r) + '\n' for r in rows))
+        if os.path.getsize(path) > 2_000_000:          # keep the newest half
+            lines = io.open(path, encoding='utf-8').read().splitlines(True)
+            io.open(path, 'w', encoding='utf-8').writelines(lines[len(lines) // 2:])
+    except OSError:
+        pass
+
+
+def cmd_recall_hook(argv):
+    """UserPromptSubmit: the hook's JSON on stdin -> the hook's JSON on stdout, or nothing."""
+    import json
+    root = argv[0]
+    try:
+        inp = json.load(sys.stdin)
+    except Exception:
+        return ''
+    prompt = inp.get('prompt') or ''
+    session = inp.get('session_id') or ''
+    on, min_score, k = recall_settings(root)
+    ledger = _ledger_path(root)
+    if not on or not prompt or not ledger or not os.path.exists(ledger):
+        return ''
+    seen_path = _seen_path(root, session)
+    named, shown, near = recall(parse_entries(ledger), prompt, _read_seen(seen_path), min_score, k)
+    now = round(datetime.datetime.now().timestamp(), 1)
+    tr = inp.get('transcript_path') or ''
+    sid = re.sub(r'\s', '', session)
+    rows = [(now, sid, tr, 'named', '', e['id']) for e in named]
+    rows += [(now, sid, tr, 'shown', s, e['id']) for s, e in shown]
+    rows += [(now, sid, tr, 'near', s, e['id']) for s, e in near]
+    if len(prompt.split()) >= 4 and prompt.strip()[:1] not in ('/', '<'):
+        rows.insert(0, (now, sid, tr, 'prompt', min_score, ''))
+    _log_recall(root, rows)
+    text = recall_text(named, shown)
+    if not text:
+        return ''
+    write_seen(root, session, [e['id'] for e in named] + [e['id'] for _, e in shown], append=True)
+    return json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
+                                              "additionalContext": text}})
+
+
+def _transcript_turns(path):
+    """[(epoch, 'human'|'agent', text)] from a Claude Code session transcript: what the user
+    typed, and what the agent itself said or passed to its tools (never what tools returned)."""
+    import json
+    out = []
+    try:
+        fh = io.open(path, encoding='utf-8', errors='replace')
+    except OSError:
+        return out
+    for line in fh:
+        try:
+            x = json.loads(line)
+            ts = datetime.datetime.fromisoformat(x['timestamp'].replace('Z', '+00:00')).timestamp()
+        except Exception:
+            continue
+        c = (x.get('message') or {}).get('content')
+        if x.get('type') == 'assistant' and isinstance(c, list):
+            said = [p.get('text', '') if p.get('type') == 'text' else json.dumps(p.get('input', {}))
+                    for p in c if p.get('type') in ('text', 'tool_use')]
+            if said:
+                out.append((ts, 'agent', '\n'.join(said)))
+        elif x.get('type') == 'user' and not x.get('isMeta') and not x.get('isCompactSummary'):
+            if isinstance(c, list):
+                if any(p.get('type') == 'tool_result' for p in c):
+                    continue
+                c = ' '.join(p.get('text', '') for p in c if p.get('type') == 'text')
+            if isinstance(c, str) and c.strip():
+                out.append((ts, 'human', c))
+    return out
+
+
+def recall_stats(root):
+    """Which recalls since the last calibration were used — the agent cited the id in its reply
+    or its tool calls, in the exchange that followed — and whether the threshold should move.
+    -> dict, or None when nothing is logged."""
+    on, cur, _ = recall_settings(root)
+    path = os.path.join(recall_dir(root) or '', 'log.tsv')
+    try:
+        raw = io.open(path, encoding='utf-8').read().splitlines()
+    except OSError:
+        return None
+    since = _git(root, 'log', '-1', '--format=%ct', '-G', '^RECALL_MIN=', '--',
+                 '.claude/ledger.conf').strip()
+    since = float(since) if since else 0.0
+    rows = []
+    for l in raw:
+        c = l.split('\t')
+        if len(c) == 6:
+            try:
+                if float(c[0]) >= since:
+                    rows.append((float(c[0]), c[1], c[2], c[3], c[4], c[5]))
+            except ValueError:
+                pass
+    turns = {}
+    used = {}
+    for ts, _, tr, kind, _, eid in rows:
+        if kind not in ('shown', 'near') or not tr:
+            continue
+        if tr not in turns:
+            turns[tr] = _transcript_turns(tr)
+        t = turns[tr]
+        humans = [i for i, (h_ts, who, _) in enumerate(t) if who == 'human' and abs(h_ts - ts) < 120]
+        if not humans:
+            continue                                   # transcript gone or not matched: unknown
+        i = min(humans, key=lambda j: abs(t[j][0] - ts))
+        reply = []
+        for h_ts, who, text in t[i + 1:]:
+            if who == 'human':
+                break
+            reply.append(text)
+        used[(ts, eid)] = re.search(r'(?<![\w-])' + re.escape(eid) + r'(?![\w-])', '\n'.join(reply)) is not None
+
+    def tally(pred):
+        rs = [(ts, eid) for ts, _, _, kind, s, eid in rows if pred(kind, s) and (ts, eid) in used]
+        return len(rs), sum(used[r] for r in rs)
+
+    def num(s):
+        try:
+            return float(s)
+        except ValueError:
+            return -1.0
+    prompts = sum(1 for r in rows if r[3] == 'prompt')
+    fired = len({r[0] for r in rows if r[3] == 'shown'})
+    shown = tally(lambda kd, s: kd == 'shown')
+    weak = tally(lambda kd, s: kd == 'shown' and num(s) < cur + 0.5)
+    near = tally(lambda kd, s: kd == 'near')
+    rec, why = cur, ''
+    if shown[0] >= RECALL_MIN_SAMPLES:
+        if weak[0] >= 8 and weak[1] / weak[0] < 0.3:
+            rec, why = cur + RECALL_STEP, f"the weakest recalls ({cur:g}–{cur + 0.5:g}) went unused: {weak[1]} of {weak[0]} cited"
+        elif near[0] >= 8 and near[1] / near[0] >= 0.3 and shown[1] / shown[0] >= 0.5:
+            rec, why = cur - RECALL_STEP, f"entries held back just under it were looked up anyway: {near[1]} of {near[0]}"
+        rec = min(max(rec, RECALL_FLOOR), RECALL_CEIL)
+    return dict(on=on, current=cur, since=since, prompts=prompts, fired=fired, shown=shown,
+                weak=weak, near=near, named=sum(1 for r in rows if r[3] == 'named'),
+                proposal=rec if rec != cur else None, why=why)
+
+
+def recall_report(root):
+    st = recall_stats(root)
+    if not st:
+        return []
+    cur = st['current']
+    since = (datetime.date.fromtimestamp(st['since']).isoformat() if st['since'] else 'the start')
+    n, u = st['shown']
+    pct = lambda a, b: f"{100 * a // b}%" if b else "–"
+    lines = [f"- RECALL_MIN {cur:g}: since {since}, recall showed {n} entr{'y' if n == 1 else 'ies'} on "
+             f"{st['fired']} of {st['prompts']} prompts ({pct(st['fired'], st['prompts'])}); "
+             f"{u} were cited ({pct(u, n)}). Weakest band ({cur:g}–{cur + 0.5:g}): {st['weak'][1]} of "
+             f"{st['weak'][0]} cited. Held back just under it: {st['near'][1]} of {st['near'][0]} "
+             f"looked up anyway."]
+    if n < RECALL_MIN_SAMPLES:
+        lines.append(f"- Calibration needs {RECALL_MIN_SAMPLES} recalls since the last change; "
+                     f"{n} so far → keep {cur:g}.")
+    elif st['proposal'] is not None:
+        lines.append(f"- {st['why']} → set RECALL_MIN={st['proposal']:g} in .claude/ledger.conf "
+                     f"(in the tidy commit, with a `Decision:` naming the change and these numbers).")
+    else:
+        lines.append(f"- The recalls are being used and little is being missed → keep {cur:g}.")
+    return lines
+
+
+def cmd_recall_stats(argv):
+    return "\n".join(recall_report(argv[0])) or "No recalls logged in this clone yet."
+
+
 def cmd_id(argv):
     return hash_id(argv[0], ' '.join(argv[1:]))
 
@@ -1480,7 +1774,8 @@ def main():
     fn = {'digest': cmd_digest, 'block': cmd_block, 'stale-rules': cmd_stale_rules,
           'lint': cmd_lint, 'id': cmd_id, 'check-msg': cmd_check_msg,
           'tidy-status': cmd_tidy_status, 'tidy-report': cmd_tidy_report,
-          'share-state': cmd_share_state, 'cli': cmd_cli}.get(mode)
+          'share-state': cmd_share_state, 'cli': cmd_cli,
+          'recall-hook': cmd_recall_hook, 'recall-stats': cmd_recall_stats}.get(mode)
     if fn is None:
         sys.exit(2)
     s = fn(rest)

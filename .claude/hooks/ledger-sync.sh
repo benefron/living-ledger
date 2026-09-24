@@ -19,7 +19,7 @@
 #
 # Decision:/Retires: rows are also appended to the level-2 log in DECISIONS.md.
 #
-# ledger-template-version: 4
+# ledger-template-version: 5
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
