@@ -128,11 +128,20 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## F-143f5b9 · CLOSED · finding · - · 2026-09-24
+a Closes: that skipped the gate was reported by the sync on every later commit; it now leaves a · not closed by line on the entry and is reported once
+→ commit c9bb852
+
+## F-3e7890b · CLOSED · finding · - · 2026-09-24
+the tidy report re-raised, at every tidy, a finding put back to STANDING by hand after a close, and any entry a tidy had kept
+→ commit c9bb852
+
 ## D-7269818 · CLOSED · decision · - · 2026-09-24
 a Closes: trailer resolves an open item or a finding, including one recorded as a fact; a decision, a retired framing or a note is never closed — the gate refuses it and points to Supersedes: or Refs:
 · Rejected: Closes: flips every STANDING entry to CLOSED | closing a retired framing would drop it from the do-not-re-propose list without the Decision + Supersedes that D-be290b3 requires
 · Rejected: the gate refuses Closes: on any STANDING entry | a fixed problem recorded as Finding: would have no honest path; Supersedes says replaced, not resolved
 → commit d1d6187
+↔ c9bb852 fix: a refused Closes: is reported once; the tidy leaves a re-opened finding alone
 
 ## D-add0c44 · CLOSED · decision · recall · 2026-09-24
 each message the user types is matched against the whole ledger, and up to three entries the session digest did not show are put in front of Claude when they score at least RECALL_MIN (2.0)
