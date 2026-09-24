@@ -128,6 +128,10 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-afe8b13 · CLOSED · decision · - · 2026-09-24
+template v6 ships as release v6.0.0: the Windows fixes (hooks through bash, upgrade commits that keep the executable bit, LF writes)
+→ commit 67879bb
+
 ## D-8db1c00 · CLOSED · decision · platform · 2026-09-24
 every ledger hook runs through bash, never by its executable bit, and every file the tool writes uses Unix line endings on every platform
 → commit e5fe0dd

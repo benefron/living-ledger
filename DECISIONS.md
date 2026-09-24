@@ -303,4 +303,5 @@ Do not hand-edit between the markers.
 | 2026-09-24 | D-7269818 | a Closes: trailer resolves an open item or a finding, including one recorded as a fact; a decision, a retired framing or a note is never closed — the gate refuses it and points to Supersedes: or Refs: | `d1d6187` |
 | 2026-09-24 | D-216a12f | template v5 ships as release v5.0.0: prompt-time recall calibrated at tidy, ledger search, and Closes: by entry type | `4de35d5` |
 | 2026-09-24 | D-8db1c00 | every ledger hook runs through bash, never by its executable bit, and every file the tool writes uses Unix line endings on every platform | `e5fe0dd` |
+| 2026-09-24 | D-afe8b13 | template v6 ships as release v6.0.0: the Windows fixes (hooks through bash, upgrade commits that keep the executable bit, LF writes) | `67879bb` |
 <!-- DECISIONS_LOG_END -->
