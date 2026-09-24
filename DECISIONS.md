@@ -301,4 +301,5 @@ Do not hand-edit between the markers.
 | 2026-09-24 | D-add0c44 | each message the user types is matched against the whole ledger, and up to three entries the session digest did not show are put in front of Claude when they score at least RECALL_MIN (2.0) | `58f67cc` |
 | 2026-09-24 | D-f4db0bf | the recall threshold is recalibrated at /ledger-tidy from whether recalled ids were cited, in steps of 0.25 between 1.5 and 3.5 once 30 recalls are logged, and the change is committed to ledger.conf | `58f67cc` |
 | 2026-09-24 | D-7269818 | a Closes: trailer resolves an open item or a finding, including one recorded as a fact; a decision, a retired framing or a note is never closed — the gate refuses it and points to Supersedes: or Refs: | `d1d6187` |
+| 2026-09-24 | D-216a12f | template v5 ships as release v5.0.0: prompt-time recall calibrated at tidy, ledger search, and Closes: by entry type | `4de35d5` |
 <!-- DECISIONS_LOG_END -->

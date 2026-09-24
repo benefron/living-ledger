@@ -128,6 +128,10 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-216a12f · CLOSED · decision · - · 2026-09-24
+template v5 ships as release v5.0.0: prompt-time recall calibrated at tidy, ledger search, and Closes: by entry type
+→ commit 4de35d5
+
 ## F-143f5b9 · CLOSED · finding · - · 2026-09-24
 a Closes: that skipped the gate was reported by the sync on every later commit; it now leaves a · not closed by line on the entry and is reported once
 → commit c9bb852
@@ -142,11 +146,13 @@ a Closes: trailer resolves an open item or a finding, including one recorded as 
 · Rejected: the gate refuses Closes: on any STANDING entry | a fixed problem recorded as Finding: would have no honest path; Supersedes says replaced, not resolved
 → commit d1d6187
 ↔ c9bb852 fix: a refused Closes: is reported once; the tidy leaves a re-opened finding alone
+↔ 4de35d5 docs(changelog): v5
 
 ## D-add0c44 · CLOSED · decision · recall · 2026-09-24
 each message the user types is matched against the whole ledger, and up to three entries the session digest did not show are put in front of Claude when they score at least RECALL_MIN (2.0)
 → commit 58f67cc
 ↔ 9bcbadc docs(decisions): the sha of D-add0c44
+↔ 4de35d5 docs(changelog): v5
 
 ## D-f4db0bf · CLOSED · decision · recall · 2026-09-24
 the recall threshold is recalibrated at /ledger-tidy from whether recalled ids were cited, in steps of 0.25 between 1.5 and 3.5 once 30 recalls are logged, and the change is committed to ledger.conf
