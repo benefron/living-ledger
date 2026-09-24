@@ -51,6 +51,53 @@ And on the section it replaces, add one line — nothing else changes:
 <!-- newest first; written by hand -->
 <!-- SECTIONS_START -->
 
+## D-add0c44 · Prompt-time recall, calibrated at tidy · 2026-09-24
+
+**What was decided.** "each message the user types is matched against the whole ledger, and up to
+three entries the session digest did not show are put in front of Claude when they score at least
+RECALL_MIN (2.0)" — and the threshold is recalibrated at `/ledger-tidy` from what was used.
+
+**Why.** The digest is bounded; in the largest real ledger (pressure-simulation, 213 entries) 163
+entries were reachable only by grep, and grep needs the right word. Before building the hook, 167
+messages the user typed in pressure-simulation and sensoryforge were replayed offline. For each
+one, recall ran against the ledger as it stood at that moment, excluding what the digest showed.
+A separate agent then rated every hit relevant, tangential or noise without seeing its score:
+
+| threshold | fires on | relevant | noise | relevant entries the agent never looked up |
+|---|---|---|---|---|
+| 1.5 | 17% | 62% | 29% | 17 |
+| 2.0 | 13% | 81% | 12% | 10 |
+| 2.5 | 8% | 83% | 6% | 6 |
+
+Scores are BM25 divided by the square root of the message's term count; raw BM25 let long pasted
+reports out-score short questions. A match must include two words outside a short list of chat
+words ("give", "run", "need", "call"…), which removed most small-talk hits. Short questions in the
+user's own words gained the most; long pasted reports produced most of the remaining noise.
+
+Calibration uses a signal that is visible without asking the user: the skill cites an entry's id
+when a recalled entry shapes its answer. Each clone logs what was shown and what was held back
+just under the threshold. At a tidy, `recall-stats` reads the session transcripts back: if the
+weakest band (threshold to threshold + 0.5) is cited less than 30% of the time, it proposes
+raising the threshold; if 30% or more of the held-back entries were looked up anyway, it proposes
+lowering it. It needs 30 recalls since the last change, and moves 0.25 at a time within 1.5–3.5.
+The last commit that changed `RECALL_MIN` resets the count, so the history lives in git.
+
+**What was rejected.** A plan-time check (a PreToolUse hook on ExitPlanMode that searches the
+plan): in the 19 real plans replayed, every strong hit was already cited by the plan, because the
+planning agent searches the ledger itself. Raw BM25 scores as the threshold: they grow with
+message length. Calibrating automatically without review: a threshold change alters what every
+session sees, so it goes through the tidy's approval like everything else.
+
+**Where it lives.** `recall`, `cmd_recall_hook`, `recall_stats` in
+`templates/hooks/_ledger_parse.py`; `templates/hooks/ledger-recall.sh`; the per-session list the
+digest writes; `RECALL_MIN` / `RECALL_MAX` / `RECALL` in `ledger.conf`; the tidy report's last
+section.
+
+**Ledger id + sha.** D-add0c44 · this commit
+
+**Validation pending.** The replay is small (two repositories, one judge). The calibration log is
+the real test: the first tidy with 30 recalls says whether 2.0 holds.
+
 ## D-a7ab56f · Content-hash entry ids · 2026-09-23
 
 **What was decided.** "entry ids are content hashes of the entry text; legacy sequential ids stay

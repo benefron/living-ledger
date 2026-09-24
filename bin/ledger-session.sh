@@ -11,7 +11,7 @@
 #
 # Silent in headless runs, outside git repos, and whenever there is nothing to say.
 #
-# ledger-template-version: 4
+# ledger-template-version: 5
 set -uo pipefail
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null

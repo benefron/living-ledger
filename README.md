@@ -24,6 +24,8 @@ Built on the **Lore** protocol — git commit trailers as a knowledge channel fo
    edit `LEDGER.md`.
 3. **Every session starts informed.** Claude gets a short digest — what is open, what is overdue,
    what is decided, what was ruled out — and, when it opens a file, what the history says about it.
+   When you bring up something older than the digest reaches, the entries on it are put in front
+   of Claude with your message, retired approaches included.
 4. **Now and then Claude suggests a tidy**: a short review of the ledger, approved by you item by
    item.
 
@@ -150,6 +152,9 @@ repeats; this catches the rewordings.
  session start ──► digest.sh ──► bounded digest (overdue, open by area, pinned, recent, retired)
                                   + housekeeping: stale rules, lint, hooks activated, upgrade due
 
+ each message ──► ledger-recall.sh ──► up to 3 entries it touches that the digest did not show
+                                        (only over a threshold that /ledger-tidy calibrates)
+
  merge / pull ──► merge=ledger driver: entries merged by id, never a textual conflict
 ```
 
@@ -187,6 +192,30 @@ Paste [`templates/AGENTS.snippet.md`](templates/AGENTS.snippet.md) into the repo
 to tell other agents it is there. How this compares with the paper, point by point:
 [`reference/lore-paper.md`](reference/lore-paper.md).
 
+## Recall: the part of the ledger the digest leaves out
+
+The digest is bounded; in a mature ledger most entries — closed findings, superseded decisions,
+older retired approaches — are not in it. So each message you type is matched against the whole
+ledger (BM25, ~50 ms), and when it clearly touches entries the session has not seen, up to three
+of them arrive with the message as one line each: id, status, what replaced it, the statement.
+An id you name is always looked up. Each entry comes up at most once per session.
+
+It stays silent unless the match clears `RECALL_MIN` (2.0 to start). That number comes from
+replaying 167 real messages from two research repositories: at 2.0 recall fired on 13% of them,
+and a blind judge rated 81% of what it would have shown relevant — including findings the agent
+never looked up on its own (*"where did the over-correction come from?"* → the finding that the
+per-cell update diverges when receptive fields overlap). Short questions in your own words are
+where it helps; long pasted reports are where the noise was.
+
+**Calibration.** Claude cites an entry's id when a recalled entry shapes its answer. Each clone
+logs what was recalled, and what was held back just under the threshold, in its git directory
+(never committed). `/ledger-tidy` reads the sessions back: if the weakest recalls go unused it
+proposes raising the threshold, if held-back entries keep getting looked up anyway it proposes
+lowering it — in steps of 0.25, between 1.5 and 3.5, once 30 recalls have been logged since the
+last change (every tidy in a busy repo, every few in a quiet one). You approve it with the rest
+of the tidy; the change is committed to `ledger.conf` with a `Decision:`, so the ledger keeps its
+own calibration history. `.claude/hooks/ledger recall-stats` shows the numbers any time.
+
 ## Keeping it true: `/ledger-tidy`
 
 A ledger drifts the way any register does: facts left open, the same decision recorded when it
@@ -205,7 +234,8 @@ decisions whose reasoning was never written, stale rules, and other files in the
 their own lists — proposes a fix for each, and applies what you approve in one commit
 (`Closes:`, `Supersedes: <old> by <new>`, a few status edits, and a `Tidy:` trailer the next
 check counts from). Nothing is deleted: a tidy *compresses what is live* — what the digest shows
-and a session has to weigh — while the history stays in the one file every tool reads.
+and a session has to weigh — while the history stays in the one file every tool reads. A tidy
+also [calibrates recall](#recall-the-part-of-the-ledger-the-digest-leaves-out).
 
 ## What runs where
 
@@ -216,6 +246,7 @@ Everything is local shell + python, readable in `templates/`. Nothing phones hom
 | `.githooks/commit-msg` | every `git commit` in the repo (you, Claude, an IDE) | reads the message and the ledger; can reject the commit |
 | `.githooks/post-commit` | after a commit | `LEDGER.md`, `DECISIONS.md`; makes the `chore: ledger sync` commit |
 | `.claude/hooks/digest.sh` | Claude Code session start / after compaction | reads the repo; activates the git hooks on a fresh clone (announced); updates your local index |
+| `.claude/hooks/ledger-recall.sh` | every message you send in Claude Code | reads the ledger; writes its log and per-session list under `.git/ledger-recall/` (never committed) |
 | `.claude/hooks/ledger-index-push.sh` | session start (async) / session end | commits + pushes `~/.claude/ledger` **only if you gave it a remote** |
 | `bin/ledger-session.sh` | session start, user-level | reads only; prints a one-line suggestion |
 | `.claude/hooks/ledger` | when you or an agent run it | reads only — except `ledger rules`, which rewrites `.claude/rules/ledger/` (gitignored; also run at session start and after each commit) |
@@ -242,7 +273,8 @@ warns when the remote is public; keep personal or strategic reasoning in a priva
 
 `.claude/ledger.conf` (committed): `LEDGER_PATH`, `DECISIONS_PATH`, `REPO_ID`, `SYNC_FROM`,
 optional `AUDIENCE_SURFACE`, `EXEMPT_SUBJECTS` / `EXEMPT_AUTHORS` (regexes — commits by pipelines
-and cron jobs; repeated trailer-less subjects are detected at install), `AUTO_HOOKS`.
+and cron jobs; repeated trailer-less subjects are detected at install), `AUTO_HOOKS`,
+`RECALL_MIN` / `RECALL_MAX` / `RECALL=off` (prompt-time recall).
 
 Environment: `LEDGER_SKIP=1` (skip the gate and sync for one command), `LEDGER_DIGEST=on|off`,
 `LEDGER_AUTO_HOOKS=0`, `LEDGER_HOME` (index location), `LL_MAX_OPEN` / `LL_MAX_RECENT` (digest caps).

@@ -116,6 +116,13 @@ digest shows only what is live and recent; search also finds the retired and sup
 After pulling work made elsewhere, `.claude/hooks/ledger validate` shows commits that skipped
 the ledger's rules.
 
+### A "Ledger recall" block arrives with the user's message
+
+A hook matched the message against the whole ledger and found entries the digest did not show.
+Read them before answering. When one shapes your answer, **cite its id** — that is how
+`/ledger-tidy` measures whether recall is worth its tokens and calibrates its threshold. Do not
+cite ids you did not use. If a recalled entry is wrong or stale, say so.
+
 ### "note that …" / "remember that …"
 
 Run `/ledger-note <text>` — a `note` (observation) or `thought` (thinking aloud, visibly *not*
@@ -161,7 +168,8 @@ Run `/ledger-tidy`: it reports candidates (open items that read as settled, over
 items, near-duplicates and possible contradictions, empty entries, stale rules, other files that
 keep their own lists), you propose in batches, the user approves, and one commit applies it
 with a `Tidy:` trailer. It never deletes an entry — compression means fewer **live** entries,
-not a second file.
+not a second file. Its report ends with the recall calibration: keep the threshold, or move it
+by 0.25 — part of the same commit when the user approves.
 
 ### A repo with no ledger, about to get its first commit
 

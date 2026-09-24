@@ -59,7 +59,7 @@ check "merge driver registered"       "git -C '$R' config --get merge.ledger.dri
 check "settings.json valid, has digest" "python3 -c 'import json;d=json.load(open(\"$R/.claude/settings.json\"));assert \"digest.sh\" in json.dumps(d)'"
 check "registered in the index"       "ls '$LL_HOME_DIR'/ledger/repos/*.md >/dev/null 2>&1"
 check "user-level session hook added" "grep -q 'ledger-session.sh' '$LL_HOME_DIR/settings.json'"
-check "every stamp is v4" "! grep -rl 'ledger-template-version: [0-35-9]' '$R/.claude' '$R/.githooks' >/dev/null"
+check "every stamp is v5" "! grep -rl 'ledger-template-version: [0-46-9]' '$R/.claude' '$R/.githooks' >/dev/null"
 git -C "$R" add -A; commit "$R" "chore: install
 Ledger: none — installing the ledger tooling"
 
@@ -313,7 +313,7 @@ C2="$WORK/clone2"; git clone -q "$B" "$C2"; cp "$SKILL/templates/LEDGER.md" "$C2
 check "a fresh clone derives identical ids" "[ \"\$(hdrs '$C2' | cut -d' ' -f2 | sort)\" = \"\$(hdrs '$B' | cut -d' ' -f2 | sort)\" ]"
 
 # ---------------------------------------------------------------------------
-echo "12. upgrades: v1 marker and v3 bookmark -> v4, nothing lost"
+echo "12. upgrades: v1 marker and v3 bookmark -> v5, nothing lost"
 U1="$(newrepo v1)"
 commit "$U1" "feat: old
 
@@ -354,7 +354,7 @@ U3="$(newrepo v3)"; installed "$U3"
 echo 'AUDIENCE_SURFACE=paper/main.tex' >> "$U3/.claude/ledger.conf"
 sed -i.bak '/^SYNC_FROM=/d' "$U3/.claude/ledger.conf"; rm -f "$U3/.claude/ledger.conf.bak"
 git -C "$U3" rev-parse --short HEAD > "$U3/.claude/.ledger-sync"
-perl -pi -e 's/ledger-template-version: 4/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
+perl -pi -e 's/ledger-template-version: 5/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
 git -C "$U3" add -A; commit "$U3" "x
 Ledger: none — simulate a v3 install"
 "$INSTALL" "$U3" --upgrade --quiet
@@ -362,6 +362,19 @@ check "v3 bookmark -> committed SYNC_FROM, file removed" "grep -q '^SYNC_FROM=[0
 check "hand-set AUDIENCE_SURFACE preserved"    "grep -qx 'AUDIENCE_SURFACE=paper/main.tex' '$U3/.claude/ledger.conf'"
 check "tree clean after --upgrade"             "[ -z \"\$(git -C '$U3' status --porcelain)\" ]"
 check "second --upgrade is a no-op" "N=\$(git -C '$U3' rev-list --count HEAD); '$INSTALL' '$U3' --upgrade --quiet; [ \$(git -C '$U3' rev-list --count HEAD) -eq \$N ]"
+
+U4="$(newrepo v4)"; installed "$U4"
+rm -f "$U4/.claude/hooks/ledger-recall.sh"
+python3 - "$U4/.claude/settings.json" <<'PYX'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p)); d['hooks'].pop('UserPromptSubmit', None); json.dump(d, open(p, 'w'))
+PYX
+perl -pi -e 's/ledger-template-version: 5/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
+git -C "$U4" add -A; commit "$U4" "x
+Ledger: none — simulate a v4 install"
+check "v4 repo: the digest offers the upgrade, naming recall" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE.*prompt-time recall'"
+"$INSTALL" "$U4" --upgrade --quiet
+check "v4 -> v5: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
 
 DL="$(newrepo dotted)"; installed "$DL"
 python3 - "$DL/DECISIONS.md" <<'PYX'
@@ -622,13 +635,94 @@ check "an id in the words ranks first" "S1 $(hid F 'the vendor API caps requests
 check "nothing relevant → says so" "S1 kubernetes helm chart | grep -q 'Nothing in the ledger matches'"
 
 # ---------------------------------------------------------------------------
+echo "13i. prompt-time recall, and its calibration at tidy"
+RC="$(newrepo recall)"; installed "$RC"
+F_OV="$(hid F 'the per-cell information-form update diverges when receptive fields overlap')"
+D_AC="$(hid D 'the filter state lives on the acuity lattice, not on the receptor grid')"
+commit "$RC" "a
+
+Opens: the per-cell information-form update diverges when receptive fields overlap"
+commit "$RC" "b
+
+Decision: the filter state lives on the acuity lattice, not on the receptor grid"
+commit "$RC" "c
+
+Decision: the vendor API is polled every ten seconds"
+commit "$RC" "d
+
+Decision: the filter state stays on the receptor grid; the acuity lattice is the control arm
+Supersedes: $D_AC"
+commit "$RC" "e
+
+Closes: $F_OV"
+sync_ "$RC"
+RH() {  # RH <session> <prompt> -> the hook's additionalContext ('' when silent)
+  python3 -c 'import json,sys; print(json.dumps({"session_id": sys.argv[1], "prompt": sys.argv[2], "transcript_path": ""}))' "$1" "$2" 2>/dev/null \
+    | ( cd "$RC" && "$RC/.claude/hooks/ledger-recall.sh" ) \
+    | python3 -c 'import json,sys; t=sys.stdin.read(); print(json.loads(t)["hookSpecificOutput"]["additionalContext"] if t.strip() else "")'
+}
+echo '{"session_id":"s1"}' | CLAUDE_PROJECT_DIR="$RC" "$RC/.claude/hooks/digest.sh" >/dev/null 2>&1
+SEEN="$RC/.git/ledger-recall/seen-s1.txt"
+check "settings.json registers the recall hook" "python3 -c 'import json;d=json.load(open(\"$RC/.claude/settings.json\"));assert \"ledger-recall.sh\" in json.dumps(d[\"hooks\"][\"UserPromptSubmit\"])'"
+check "the digest records what it showed, for this session" "grep -q '$(hid D 'the vendor API is polled every ten seconds')' '$SEEN' && ! grep -q '$F_OV' '$SEEN'"
+RH s1 "why does the update diverge when the receptive fields overlap this much?" > "$WORK/r1"
+check "a question on something the digest left out recalls it" "grep -q '$F_OV' '$WORK/r1' && grep -q 'Ledger recall' '$WORK/r1'"
+check "…once per session"                 "[ -z \"\$(RH s1 'why does the update diverge when the receptive fields overlap this much?')\" ]"
+check "…and again in another session"     "RH s2 'why does the update diverge when the receptive fields overlap this much?' | grep -q '$F_OV'"
+check "an id the message names is resolved, with what replaced it" "RH s3 'what happened to $D_AC?' | grep -q 'SUPERSEDED by'"
+check "small talk stays silent"           "[ -z \"\$(RH s4 'ok that sounds good, please run it again now')\" ]"
+check "slash commands are left alone"     "[ -z \"\$(RH s5 '/ledger-tidy the receptive fields overlap and the update diverges')\" ]"
+check "unrelated questions stay silent"   "[ -z \"\$(RH s6 'how do I configure the kubernetes helm chart for staging?')\" ]"
+check "headless runs: silent"             "[ -z \"\$(CLAUDE_CODE_ENTRYPOINT=sdk-cli RH s7 'why does the update diverge when the receptive fields overlap this much?')\" ]"
+printf 'RECALL=off\n' >> "$RC/.claude/ledger.conf"
+check "RECALL=off: silent"                "[ -z \"\$(RH s8 'why does the update diverge when the receptive fields overlap this much?')\" ]"
+sed -i.bak '/^RECALL=off$/d' "$RC/.claude/ledger.conf"; rm -f "$RC/.claude/ledger.conf.bak"
+check "every prompt and recall is logged in the git dir, not the repo" "grep -q '	prompt	' '$RC/.git/ledger-recall/log.tsv' && grep -q '	shown	' '$RC/.git/ledger-recall/log.tsv' && ! git -C '$RC' status --porcelain | grep -q recall"
+
+# calibration: a synthetic transcript, where the agent cites some of what was recalled
+CAL() {  # CAL <repo> <n shown> <score> <n cited> <n near> <n near cited>
+  python3 - "$@" <<'PYC'
+import datetime, json, os, sys
+repo, n, score, cited, nn, nc = sys.argv[1], int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])
+d = os.path.join(repo, '.git', 'ledger-recall'); os.makedirs(d, exist_ok=True)
+tr = os.path.join(d, 'transcript.jsonl')
+t0 = datetime.datetime.now().timestamp() - 50000
+iso = lambda t: datetime.datetime.fromtimestamp(t, datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
+log, recs = [], []
+for i in range(max(n, nn)):
+    t = t0 + i * 600
+    log.append(f"{t}\ts\t{tr}\tprompt\t2.0\t")
+    said = []
+    if i < n:
+        log.append(f"{t}\ts\t{tr}\tshown\t{score}\tF-{i:07x}"); said += [f"F-{i:07x}"] if i < cited else []
+    if i < nn:
+        log.append(f"{t}\ts\t{tr}\tnear\t1.8\tD-{i:07x}"); said += [f"D-{i:07x}"] if i < nc else []
+    recs.append({"type": "user", "timestamp": iso(t + 1), "message": {"role": "user", "content": f"question {i}"}})
+    recs.append({"type": "assistant", "timestamp": iso(t + 5), "message": {"content": [{"type": "text", "text": "answer " + " ".join(said)}]}})
+open(os.path.join(d, 'log.tsv'), 'w').write("\n".join(log) + "\n")
+open(tr, 'w').write("\n".join(json.dumps(r) for r in recs) + "\n")
+PYC
+  ( cd "$1" && .claude/hooks/ledger recall-stats )
+}
+CR="$(newrepo calib)"; installed "$CR"
+check "too few recalls: keep, and say how many more are needed" "CAL '$CR' 10 2.1 2 0 0 | grep -q 'needs 30.*10 so far'"
+check "the weakest recalls go unused: raise the threshold" "CAL '$CR' 40 2.1 5 0 0 | grep -q 'set RECALL_MIN=2.25'"
+check "held-back entries get looked up anyway: lower it" "CAL '$CR' 40 3.0 30 10 5 | grep -q 'set RECALL_MIN=1.75'"
+check "used and nothing missed: keep"     "CAL '$CR' 40 3.0 30 10 0 | grep -q 'keep 2'"
+check "the tidy report carries the calibration" "( cd '$CR' && .claude/hooks/ledger tidy ) | grep -q 'Recall threshold'"
+printf 'RECALL_MIN=2.25\n' >> "$CR/.claude/ledger.conf"; git -C "$CR" add -A; commit "$CR" "chore(ledger): tidy
+Decision: recall threshold 2.0 -> 2.25
+Tidy: recall calibrated"
+check "a committed change restarts the count" "( cd '$CR' && .claude/hooks/ledger recall-stats ) | grep -q '0 so far'"
+
+# ---------------------------------------------------------------------------
 echo "14. the user-level session hook"
 SESS="$SKILL/bin/ledger-session.sh"
 NL="$(newrepo noledger)"
 O1="$(echo "{\"cwd\":\"$NL\"}" | "$SESS")"; O2="$(echo "{\"cwd\":\"$NL\"}" | "$SESS")"
 check "no ledger: nudge once"  "printf '%s' \"\$O1\" | grep -q 'ledger-init' && [ -z \"\$O2\" ]"
 check "v1 ledger: upgrade flag" "mkdir -p '$WORK/v1b/.claude'; git -C '$WORK/v1b' init -q; printf '<!-- ENTRIES_START -->\n' > '$WORK/v1b/LEDGER.md'; printf '# ledger-template-version: 1\nLEDGER_PATH=LEDGER.md\n' > '$WORK/v1b/.claude/ledger.conf'; echo '{\"cwd\":\"$WORK/v1b\"}' | '$SESS' | grep -q 'LEDGER UPGRADE AVAILABLE'"
-check "v4 repo: silent"         "[ -z \"\$(echo '{\"cwd\":\"$D\"}' | '$SESS')\" ]"
+check "current repo: silent"         "[ -z \"\$(echo '{\"cwd\":\"$D\"}' | '$SESS')\" ]"
 check "headless: silent"        "[ -z \"\$(echo '{\"cwd\":\"$WORK/v1b\"}' | CLAUDE_CODE_ENTRYPOINT=sdk-cli '$SESS')\" ]"
 
 # ---------------------------------------------------------------------------

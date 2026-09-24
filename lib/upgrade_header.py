@@ -10,7 +10,7 @@ names, its extra sections) are never rewritten, only appended beside.
 
 Prints a one-line summary of what it added, or nothing.
 
-ledger-template-version: 4
+ledger-template-version: 5
 """
 import io
 import sys

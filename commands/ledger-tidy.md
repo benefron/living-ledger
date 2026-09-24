@@ -38,7 +38,9 @@ It lists candidates, each with the reason it was flagged: open items that read a
 overdue or aging items, similar entries (duplicate, refinement or contradiction), open items that
 mirror another register's item (`EXTERNAL_IDS`) beside that register's own status, empty entries,
 long-pinned entries, recent decisions with no written reasoning, stale rules, lint, and other
-files in the repo that keep their own lists (retired framings, concerns, status docs). These are
+files in the repo that keep their own lists (retired framings, concerns, status docs), and last,
+the **recall threshold**: how much of what prompt-time recall showed was cited, how much it held
+back that got looked up anyway, and whether `RECALL_MIN` should move. These are
 heuristics: read each entry (`grep -n -A6 '^## <id> '`) and, where needed, its commit
 (`git show <sha>`) before proposing anything. `--report-only`: show the report and stop.
 
@@ -61,6 +63,7 @@ Proposals, and how each is applied:
 | no written reasoning | offer a `DECISIONS.md` section (the skill's template); "self-evident" is a fine answer |
 | stale rule | update or delete the file under `.claude/rules/` |
 | other registers | bring them in line with the ledger, or replace their lists with a pointer to it |
+| recall threshold | only when the report proposes a change: set `RECALL_MIN=<new>` in `.claude/ledger.conf`, and add `Decision: recall threshold <old> → <new> — <the report's reason and numbers>` |
 
 Wait for approve / edit / decline on each batch. Never apply anything unapproved.
 
@@ -70,7 +73,7 @@ Hand edits (status flips, tidied lines, unpins, rules, DECISIONS sections) go in
 tree; relations go into the trailers. Then:
 
 ```bash
-git add <ledger> <decisions> .claude/rules
+git add <ledger> <decisions> .claude/rules .claude/ledger.conf
 git commit -m "chore(ledger): tidy" \
   -m "<one or two sentences: what the pass found>" \
   -m "Closes: F-…, A-…

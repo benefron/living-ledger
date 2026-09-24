@@ -5,8 +5,18 @@ running an older template is flagged at session start with `LEDGER UPGRADE AVAIL
 `/ledger-init --upgrade` (or `install.sh <repo> --upgrade`) upgrades it in one commit without
 rewriting or renumbering any entry.
 
-## Unreleased
+## Unreleased (template v5)
 
+- **Prompt-time recall** (`ledger-recall.sh`, a UserPromptSubmit hook): each message is matched
+  against the whole ledger; up to `RECALL_MAX` (3) entries the digest did not show, scoring at
+  least `RECALL_MIN` (2.0), arrive with it — once per session each. Ids the message names are
+  always resolved. Small talk, slash commands and headless runs get nothing. The starting
+  threshold comes from replaying 167 real messages (fired on 13%, 81% judged relevant).
+- **Calibration at `/ledger-tidy`**: recalls and near misses are logged per clone in
+  `.git/ledger-recall/`; the tidy report reads the sessions back (was the id cited?) and proposes
+  moving `RECALL_MIN` by 0.25 once 30 recalls have been logged since the last change, which is
+  committed to `ledger.conf`. `ledger recall-stats` shows the same numbers.
+- The digest records which entries it showed, per session, so recall does not repeat them.
 - `ledger search <words>`: BM25 over every entry, live or dead, with its status and what
   replaced it; an id named in the query ranks first.
 

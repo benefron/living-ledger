@@ -5,6 +5,8 @@ This repository keeps a ledger of decisions, findings, open questions and retire
 
 - **Before changing code in an area you do not know**, run `.claude/hooks/ledger context <path>`:
   it lists the directives, constraints and rejected alternatives recorded for that path.
+- **Before proposing an approach**, run `.claude/hooks/ledger search <key words>`: it finds past
+  decisions, findings and retired approaches on the topic, including superseded ones.
 - **Do not re-propose** anything under `.claude/hooks/ledger retired`.
 - **Every commit carries a ledger trailer** in its last paragraph — `Decision:`, `Finding:`,
   `Opens:`, `Fixed:`, `Action:`, `Retires:`, `Closes: <id>`, `Supersedes: <id>`, `Refs: <id>` —

@@ -12,7 +12,7 @@
 # so nothing in any working tree is ever modified. `--sync` is accepted and ignored (v3 used
 # it to write those entries into each repo; v4 never writes outside a commit).
 #
-# ledger-template-version: 4
+# ledger-template-version: 5
 set -uo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
