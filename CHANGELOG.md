@@ -5,6 +5,16 @@ running an older template is flagged at session start with `LEDGER UPGRADE AVAIL
 `/ledger-init --upgrade` (or `install.sh <repo> --upgrade`) upgrades it in one commit without
 rewriting or renumbering any entry.
 
+## v7 — 2026-09-29
+
+Windows, a third time: the lab PC's first tidy found 30 lines of mojibake in one ledger.
+
+- **UTF-8 everywhere.** The merge driver and the sync read git's output through Python with the
+  system code page, so on Windows `—` came back as `â€”` and was written into the ledger. Git
+  output, stdin and stdout are now read as UTF-8 on every platform (`PYTHONUTF8=1` in every hook,
+  and explicit UTF-8 decoding of every git call). A test runs the sync and a merge under a
+  Latin-1 locale.
+
 ## v6 — 2026-09-24
 
 Windows: found by running v5 on a Windows lab PC and pulling its repositories on a Mac.

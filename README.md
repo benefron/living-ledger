@@ -316,7 +316,7 @@ are worked from a Windows lab PC. Between them they have 237 commits since the l
 (9 and 14 September), 123 of them carrying ledger records, and 240 entries. The v1 digest and
 sync ran there through September. On 24 September the upgrade to v5 ran there too: the upgrade
 commit, a merge through the ledger's merge driver, and the post-commit sync's automatic commit.
-Windows also exposed two bugs, both fixed in v6:
+Windows also exposed three bugs, fixed in v6 and v7:
 - Git on Windows ignores the executable bit, so the upgrade committed its new scripts
   non-executable. On a Mac clone of those repositories, the shim that runs the commit gate
   skipped a hook it could not execute, and did so silently. Hooks now run through `bash`, so the
@@ -324,6 +324,9 @@ Windows also exposed two bugs, both fixed in v6:
 - Python on Windows writes Windows line endings unless told not to, so the merge driver and the
   sync turned one ledger CRLF, and the next sync on a Mac would have rewritten every line. Every
   file is now written with Unix line endings.
+- Python on Windows also decodes git's output with the system code page, so the same merge wrote
+  30 lines of mojibake (`—` became `â€”`), found by the lab PC's first tidy. Fixed in v7: every
+  hook reads and writes UTF-8.
 
 ## Development
 

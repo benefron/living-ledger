@@ -59,7 +59,7 @@ check "merge driver registered"       "git -C '$R' config --get merge.ledger.dri
 check "settings.json valid, has digest" "python3 -c 'import json;d=json.load(open(\"$R/.claude/settings.json\"));assert \"digest.sh\" in json.dumps(d)'"
 check "registered in the index"       "ls '$LL_HOME_DIR'/ledger/repos/*.md >/dev/null 2>&1"
 check "user-level session hook added" "grep -q 'ledger-session.sh' '$LL_HOME_DIR/settings.json'"
-check "every stamp is v6" "! grep -rl 'ledger-template-version: [0-57-9]' '$R/.claude' '$R/.githooks' >/dev/null"
+check "every stamp is v7" "! grep -rl 'ledger-template-version: [0-68-9]' '$R/.claude' '$R/.githooks' >/dev/null"
 git -C "$R" add -A; commit "$R" "chore: install
 Ledger: none — installing the ledger tooling"
 
@@ -377,7 +377,7 @@ C2="$WORK/clone2"; git clone -q "$B" "$C2"; cp "$SKILL/templates/LEDGER.md" "$C2
 check "a fresh clone derives identical ids" "[ \"\$(hdrs '$C2' | cut -d' ' -f2 | sort)\" = \"\$(hdrs '$B' | cut -d' ' -f2 | sort)\" ]"
 
 # ---------------------------------------------------------------------------
-echo "12. upgrades: v1 marker and v3 bookmark -> v6, nothing lost"
+echo "12. upgrades: v1 marker and v3 bookmark -> v7, nothing lost"
 U1="$(newrepo v1)"
 commit "$U1" "feat: old
 
@@ -418,7 +418,7 @@ U3="$(newrepo v3)"; installed "$U3"
 echo 'AUDIENCE_SURFACE=paper/main.tex' >> "$U3/.claude/ledger.conf"
 sed -i.bak '/^SYNC_FROM=/d' "$U3/.claude/ledger.conf"; rm -f "$U3/.claude/ledger.conf.bak"
 git -C "$U3" rev-parse --short HEAD > "$U3/.claude/.ledger-sync"
-perl -pi -e 's/ledger-template-version: 6/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
+perl -pi -e 's/ledger-template-version: 7/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
 git -C "$U3" add -A; commit "$U3" "x
 Ledger: none — simulate a v3 install"
 "$INSTALL" "$U3" --upgrade --quiet
@@ -433,12 +433,12 @@ python3 - "$U4/.claude/settings.json" <<'PYX'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p)); d['hooks'].pop('UserPromptSubmit', None); json.dump(d, open(p, 'w'))
 PYX
-perl -pi -e 's/ledger-template-version: 6/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
+perl -pi -e 's/ledger-template-version: 7/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
 git -C "$U4" add -A; commit "$U4" "x
 Ledger: none — simulate a v4 install"
 check "v4 repo: the digest offers the upgrade, naming recall" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE.*prompt-time recall'"
 "$INSTALL" "$U4" --upgrade --quiet
-check "v4 -> v6: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
+check "v4 -> v7: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
 
 DL="$(newrepo dotted)"; installed "$DL"
 python3 - "$DL/DECISIONS.md" <<'PYX'
@@ -801,7 +801,7 @@ FM="$(newrepo filemode)"; git -C "$FM" config core.fileMode false
 Ledger: none — installing the ledger tooling"
 check "git ignoring exec bits (Windows): a fresh install still commits its scripts as 100755" "[ -z \"\$(git -C '$FM' ls-tree -r HEAD -- .claude/hooks .githooks | grep -v '_ledger_' | grep -v '^100755')\" ]"
 git -C "$FM" rm -q --cached .claude/hooks/ledger-recall.sh; rm -f "$FM/.claude/hooks/ledger-recall.sh"
-perl -pi -e 's/ledger-template-version: 6/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
+perl -pi -e 's/ledger-template-version: 7/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
 git -C "$FM" add -A; commit "$FM" "x
 Ledger: none — simulate a v5 install"
 printf 'mine\n' > "$FM/user.txt"; git -C "$FM" add user.txt
@@ -816,6 +816,26 @@ git -C "$CR" add LEDGER.md; commit "$CR" "x
 Ledger: none — simulate a ledger written with CRLF line endings"
 hc "$CR" -m "feat: b" -m "Decision: exports are written as parquet files"
 check "a CRLF ledger is written back with LF, entries intact" "! grep -q \$'\\r' '$CR/LEDGER.md' && grep -q 'polled every ten seconds' '$CR/LEDGER.md' && grep -q 'written as parquet files' '$CR/LEDGER.md'"
+
+# ---------------------------------------------------------------------------
+echo "13k. UTF-8 where the system code page is not (Python on Windows)"
+locale -a > "$WORK/locales" 2>/dev/null
+if grep -qx 'en_US.ISO8859-1' "$WORK/locales"; then
+  U8="$(newrepo utf8)"; installed "$U8"
+  ( export LC_ALL=en_US.ISO8859-1; unset PYTHONUTF8
+    hc "$U8" -m "feat: a" -m "Decision: the queue replaces the lock — µs latency, not ms" )
+  check "the sync keeps UTF-8 text intact under a Latin-1 code page" "grep -q 'the lock — µs latency' '$U8/LEDGER.md' && ! grep -q 'â€' '$U8/LEDGER.md'"
+  git -C "$U8" checkout -q -b side
+  ( export LC_ALL=en_US.ISO8859-1; unset PYTHONUTF8
+    hc "$U8" -m "feat: b" -m "Decision: exports carry a µ-prefixed unit — always explicit" )
+  git -C "$U8" checkout -q main
+  ( export LC_ALL=en_US.ISO8859-1; unset PYTHONUTF8
+    hc "$U8" -m "feat: c" -m "Decision: the rig clock is the time base — not the host" )
+  ( export LC_ALL=en_US.ISO8859-1; unset PYTHONUTF8; cd "$U8" && git merge -q --no-edit side >/dev/null 2>&1 )
+  check "…and so does the merge driver" "grep -q 'µ-prefixed unit — always' '$U8/LEDGER.md' && grep -q 'time base — not the host' '$U8/LEDGER.md' && ! grep -q 'â€\|Â·' '$U8/LEDGER.md' && [ -z \"\$(git -C '$U8' diff --name-only --diff-filter=U)\" ]"
+else
+  echo "  skip (no en_US.ISO8859-1 locale on this system)"
+fi
 
 # ---------------------------------------------------------------------------
 echo "14. the user-level session hook"

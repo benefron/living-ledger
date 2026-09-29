@@ -46,7 +46,7 @@ every clone and branch, so two machines or two branches can never hand out one i
 rebase or squash-merge leaves the id intact. Legacy sequential ids (`F-014`) are still parsed
 everywhere and never renumbered.
 
-ledger-template-version: 6
+ledger-template-version: 7
 """
 import datetime
 import hashlib
@@ -615,7 +615,7 @@ def check_msg(msgfile, root):
         if not line.startswith('#'):
             kept.append(line)
     import subprocess
-    author = subprocess.run(['git', 'var', 'GIT_AUTHOR_IDENT'], capture_output=True, text=True,
+    author = subprocess.run(['git', 'var', 'GIT_AUTHOR_IDENT'], capture_output=True, text=True, encoding='utf-8', errors='replace',
                             cwd=root).stdout
     return check_body('\n'.join(kept).strip(), root, author)
 
@@ -767,7 +767,7 @@ def cmd_check_msg(argv):
 
 def _git(root, *args):
     import subprocess
-    return subprocess.run(['git', '-C', root, *args], capture_output=True, text=True).stdout
+    return subprocess.run(['git', '-C', root, *args], capture_output=True, text=True, encoding='utf-8', errors='replace').stdout
 
 
 def _counted_commits(root, rev_range):
@@ -1822,6 +1822,11 @@ def cmd_id(argv):
 
 
 def main():
+    for stream in (sys.stdin, sys.stdout, sys.stderr):     # UTF-8 even where PYTHONUTF8 is unset
+        try:
+            stream.reconfigure(encoding='utf-8', errors='replace')
+        except (AttributeError, ValueError):
+            pass
     if len(sys.argv) < 2:
         sys.exit(2)
     mode, rest = sys.argv[1], sys.argv[2:]
