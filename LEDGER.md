@@ -128,6 +128,10 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## F-a53793f · STANDING · finding · - · 2026-09-29
+across four repositories on 2026-09-29, 705 entries, 168 items closed by commits (56 after a week or more open), 161 Supersedes/Refs trailers and 394 files citing entry ids; first tidies cut open lists 85 to 5, 19 to 5, 17 to 0 and 41 to 24
+→ commit 53b3576
+
 ## D-4a63728 · CLOSED · decision · platform · 2026-09-29
 every hook reads git output, stdin and stdout as UTF-8 on every platform, whatever the system code page
 → commit 72aed6b
@@ -182,6 +186,7 @@ each message the user types is matched against the whole ledger, and up to three
 → commit 58f67cc
 ↔ 9bcbadc docs(decisions): the sha of D-add0c44
 ↔ 4de35d5 docs(changelog): v5
+↔ 53b3576 docs: evidence of the ledger at work in four repositories
 
 ## D-f4db0bf · CLOSED · decision · recall · 2026-09-24
 the recall threshold is recalibrated at /ledger-tidy from whether recalled ids were cited, in steps of 0.25 between 1.5 and 3.5 once 30 recalls are logged, and the change is committed to ledger.conf
