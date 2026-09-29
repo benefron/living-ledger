@@ -9,6 +9,8 @@ rewriting or renumbering any entry.
 
 Windows, a third time: the lab PC's first tidy found 30 lines of mojibake in one ledger.
 
+- `docs/evidence.md`: the ledger at work in four repositories, measured from git history.
+
 - **UTF-8 everywhere.** The merge driver and the sync read git's output through Python with the
   system code page, so on Windows `—` came back as `â€”` and was written into the ledger. Git
   output, stdin and stdout are now read as UTF-8 on every platform (`PYTHONUTF8=1` in every hook,
