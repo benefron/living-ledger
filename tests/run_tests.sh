@@ -59,7 +59,7 @@ check "merge driver registered"       "git -C '$R' config --get merge.ledger.dri
 check "settings.json valid, has digest" "python3 -c 'import json;d=json.load(open(\"$R/.claude/settings.json\"));assert \"digest.sh\" in json.dumps(d)'"
 check "registered in the index"       "ls '$LL_HOME_DIR'/ledger/repos/*.md >/dev/null 2>&1"
 check "user-level session hook added" "grep -q 'ledger-session.sh' '$LL_HOME_DIR/settings.json'"
-check "every stamp is v7" "! grep -rl 'ledger-template-version: [0-68-9]' '$R/.claude' '$R/.githooks' >/dev/null"
+check "every stamp is v8" "! grep -rl 'ledger-template-version: [0-79]' '$R/.claude' '$R/.githooks' >/dev/null"
 git -C "$R" add -A; commit "$R" "chore: install
 Ledger: none — installing the ledger tooling"
 
@@ -377,7 +377,7 @@ C2="$WORK/clone2"; git clone -q "$B" "$C2"; cp "$SKILL/templates/LEDGER.md" "$C2
 check "a fresh clone derives identical ids" "[ \"\$(hdrs '$C2' | cut -d' ' -f2 | sort)\" = \"\$(hdrs '$B' | cut -d' ' -f2 | sort)\" ]"
 
 # ---------------------------------------------------------------------------
-echo "12. upgrades: v1 marker and v3 bookmark -> v7, nothing lost"
+echo "12. upgrades: v1 marker and v3 bookmark -> v8, nothing lost"
 U1="$(newrepo v1)"
 commit "$U1" "feat: old
 
@@ -418,7 +418,7 @@ U3="$(newrepo v3)"; installed "$U3"
 echo 'AUDIENCE_SURFACE=paper/main.tex' >> "$U3/.claude/ledger.conf"
 sed -i.bak '/^SYNC_FROM=/d' "$U3/.claude/ledger.conf"; rm -f "$U3/.claude/ledger.conf.bak"
 git -C "$U3" rev-parse --short HEAD > "$U3/.claude/.ledger-sync"
-perl -pi -e 's/ledger-template-version: 7/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
+perl -pi -e 's/ledger-template-version: 8/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
 git -C "$U3" add -A; commit "$U3" "x
 Ledger: none — simulate a v3 install"
 "$INSTALL" "$U3" --upgrade --quiet
@@ -433,12 +433,12 @@ python3 - "$U4/.claude/settings.json" <<'PYX'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p)); d['hooks'].pop('UserPromptSubmit', None); json.dump(d, open(p, 'w'))
 PYX
-perl -pi -e 's/ledger-template-version: 7/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
+perl -pi -e 's/ledger-template-version: 8/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
 git -C "$U4" add -A; commit "$U4" "x
 Ledger: none — simulate a v4 install"
 check "v4 repo: the digest offers the upgrade, naming recall" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE.*prompt-time recall'"
 "$INSTALL" "$U4" --upgrade --quiet
-check "v4 -> v7: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
+check "v4 -> v8: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
 
 DL="$(newrepo dotted)"; installed "$DL"
 python3 - "$DL/DECISIONS.md" <<'PYX'
@@ -668,6 +668,9 @@ check "the gate stops re-adopting a retired framing" "grep -q 'retired' '$WORK/e
 hc "$LQ" -m "x" -m "Decision: run a nightly batch job for the export pipeline, good enough for now
 Supersedes: $(hid R 'a nightly batch job is good enough for the export pipeline')"
 check "…unless the commit supersedes it on purpose" "[ \$? -eq 0 ]"
+check "each re-proposal the gate stopped is logged in the git dir" "[ \$(grep -c '	gate-reproposal	' '$LQ/.git/ledger-recall/log.tsv') -eq 2 ]"
+check "recall-stats counts them" "L1 recall-stats | grep -q 'stopped 2 re-proposals of a retired or rejected approach'"
+check "the tidy report shows re-proposals caught since the last tidy" "L1 tidy | grep -A1 'Re-proposals caught' | grep -q 'stopped 2 re-proposals'"
 for i in 1 2 3; do echo "$i" >> "$LQ/src/auth.py"; git -C "$LQ" add -A; hc "$LQ" -m "tweak $i" -m "Ledger: none — trivial change to the auth file"; done
 check "stale: a directive whose file changed since" "L1 stale 3 | grep -q 'intentionally broad'"
 git -C "$LQ" -c core.hooksPath="$NOHOOKS" commit -q --allow-empty -m "wip without a trailer"
@@ -801,7 +804,7 @@ FM="$(newrepo filemode)"; git -C "$FM" config core.fileMode false
 Ledger: none — installing the ledger tooling"
 check "git ignoring exec bits (Windows): a fresh install still commits its scripts as 100755" "[ -z \"\$(git -C '$FM' ls-tree -r HEAD -- .claude/hooks .githooks | grep -v '_ledger_' | grep -v '^100755')\" ]"
 git -C "$FM" rm -q --cached .claude/hooks/ledger-recall.sh; rm -f "$FM/.claude/hooks/ledger-recall.sh"
-perl -pi -e 's/ledger-template-version: 7/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
+perl -pi -e 's/ledger-template-version: 8/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
 git -C "$FM" add -A; commit "$FM" "x
 Ledger: none — simulate a v5 install"
 printf 'mine\n' > "$FM/user.txt"; git -C "$FM" add user.txt

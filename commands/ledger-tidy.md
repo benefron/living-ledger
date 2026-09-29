@@ -41,7 +41,9 @@ entries (duplicate, refinement or contradiction), open items that
 mirror another register's item (`EXTERNAL_IDS`) beside that register's own status, empty entries,
 long-pinned entries, recent decisions with no written reasoning, stale rules, lint, and other
 files in the repo that keep their own lists (retired framings, concerns, status docs), and last,
-the **recall threshold**: how much of what prompt-time recall showed was cited, how much it held
+the **re-proposals caught** since the last tidy (commits the gate refused for re-adopting a
+retired or rejected approach or restating a live entry, and dead ends recall surfaced that were
+then cited; report them, there is nothing to apply), and the **recall threshold**: how much of what prompt-time recall showed was cited, how much it held
 back that got looked up anyway, and whether `RECALL_MIN` should move. These are
 heuristics: read each entry (`grep -n -A6 '^## <id> '`) and, where needed, its commit
 (`git show <sha>`) before proposing anything. `--report-only`: show the report and stop.

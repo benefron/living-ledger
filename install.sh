@@ -15,14 +15,14 @@
 # lives, whether to backfill) are made by the /ledger-init command before it calls
 # this script with the flags decided.
 #
-# ledger-template-version: 7
+# ledger-template-version: 8
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TPL="$SKILL_DIR/templates"
 COMMANDS_SRC="$SKILL_DIR/commands"
 QUIET=0
-LL_TEMPLATE_VERSION=7
+LL_TEMPLATE_VERSION=8
 say() { [ "$QUIET" = 1 ] || printf '%s\n' "$*"; }
 # the scripts a repo carries that git must record as executable (100755)
 LL_EXEC_FILES=".claude/hooks/digest.sh .claude/hooks/ledger-recall.sh .claude/hooks/ledger-sync.sh

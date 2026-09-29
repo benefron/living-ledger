@@ -5,6 +5,15 @@ running an older template is flagged at session start with `LEDGER UPGRADE AVAIL
 `/ledger-init --upgrade` (or `install.sh <repo> --upgrade`) upgrades it in one commit without
 rewriting or renumbering any entry.
 
+## v8 — 2026-09-29
+
+- **Re-proposals caught, counted.** The point of the ledger is that settled questions stay
+  settled, and until now nothing measured it. The commit gate now logs each refusal (in the
+  clone's git dir): a decision that re-adopts a retired framing or a rejected alternative, and
+  an entry that restates a live one. Recall notes when it showed a dead end (a retired or
+  superseded entry) and Claude cited it. The tidy report has a "Re-proposals caught" section
+  covering the time since the last tidy, and `ledger recall-stats` shows the same numbers.
+
 ## v7 — 2026-09-29
 
 Windows, a third time: the lab PC's first tidy found 30 lines of mojibake in one ledger.

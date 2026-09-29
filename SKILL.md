@@ -168,7 +168,7 @@ Run `/ledger-tidy`: it reports candidates (open items that read as settled, over
 items, near-duplicates and possible contradictions, empty entries, stale rules, other files that
 keep their own lists), you propose in batches, the user approves, and one commit applies it
 with a `Tidy:` trailer. It never deletes an entry — compression means fewer **live** entries,
-not a second file. Its report ends with the recall calibration: keep the threshold, or move it
+not a second file. Its report ends with the re-proposals the ledger caught since the last tidy, and the recall calibration: keep the threshold, or move it
 by 0.25 — part of the same commit when the user approves.
 
 ### A repo with no ledger, about to get its first commit

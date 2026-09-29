@@ -92,8 +92,77 @@ exposed three bugs:
 All three were found by using the ledger itself: a tidy, and pulling the repositories on the
 other machine.
 
+## Did sessions go back over settled ground?
+
+This is the point of the tool, so it deserves a direct check. Re-litigation should leave traces
+in git:
+- the same idea recorded again days later, not linked to the earlier entry;
+- a decision revised and then revised back;
+- an item reopened;
+- a revert commit.
+
+We looked for all four across the four repositories:
+
+| trace | found |
+|---|---|
+| near-identical entries recorded 2+ days apart without a link | 2 in about 700 entries, neither a real re-discovery |
+| a decision superseded, then brought back | 0 (among 19 superseded entries) |
+| an entry reopened | 0 |
+| a revert commit since late August | 0 |
+
+The two unlinked pairs are a finding and, 12 days later, the decision that settled it; and two
+different decisions about the same rig's signals. So there's no sign of re-litigation in the
+history.
+
+That is not proof:
+- The comparison matches on shared words, so an old idea rediscovered in new words is missed.
+- The most common form never reaches git: Claude re-proposes a retired approach, and the user
+  says "we did that".
+- There's no measurement from before the ledger, only the hand-kept list of retired framings
+  that one repository started because approaches kept coming back.
+
+From template v8 this is counted as it happens. The commit gate logs each commit it refuses for
+re-adopting a retired or rejected approach, or for restating a live entry. Recall notes each
+dead end it surfaced that Claude then cited. Each tidy reports the count.
+
+## Assessment: is it working, and is it worth it?
+
+**It works for code and research repositories.**
+- Records get made: 705 entries.
+- Items get closed, including the ones that lingered.
+- Decisions are cited where the code relies on them.
+- The tidies keep the open lists honest.
+
+**Compared with Claude's memory:** that memory is per machine and per user, and it isn't in the
+repository. The Windows PC and the cloud sessions never see it, and two of the four first tidies
+ran in cloud sessions. The ledger travels with the repository, so every machine and session
+starts from the same record.
+
+**Compared with report files:** status documents drift, and the history shows it.
+- One repository's pending calls lived in a status document and were missing from the ledger
+  until a tidy.
+- Another's plan-status file had to be marked as a snapshot that points at the ledger.
+- A docstring still called a finding open after the rig had answered it.
+
+Reports remain the right place for the narrative. The ledger is better for state: what is open,
+decided and dead, tied to the commits and code that carry it.
+
+**Running cost is low.**
+- The user approves one line per record and spends about ten minutes per tidy.
+- The session digest is about 2–3k tokens, plus about 150 on the prompts where recall fires.
+- The most visible cost is commit noise: one repository has 82 automatic sync commits among 322.
+
+**The building cost was high:** four template versions in a week, three of them Windows fixes.
+It is efficient only once it stops changing under the user.
+
+**Unproven so far:**
+- **Recall:** it fired often, and early citations were rare. Calibration needs 30 recalls first.
+- **Decisions beyond code:** they work where they travel with committed documents, as in the
+  research simulation's science and slides. The one non-code planning workspace is still
+  unproven.
+
 ## Limits of this evidence
 
 Counts of closes and citations show that the ledger is being used, not that it caused better
-work. Whether it stops sessions re-proposing retired approaches is the point of the tool, and
-nothing here counts it. All four repositories have one developer.
+work. All four repositories have one developer. The re-litigation check above can only see what
+reaches git.
