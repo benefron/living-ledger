@@ -311,6 +311,12 @@ wrapped, "open" lists full of settled facts, auto-sync failing when `DECISIONS.m
 gitignored, `core.hooksPath` silently disabling Git LFS, and the digest leaking into headless
 pipeline calls. See [`CHANGELOG.md`](CHANGELOG.md) and this repo's own [`LEDGER.md`](LEDGER.md).
 
+**A week later (29 September),** four of those ledgers held 705 entries. Commits had closed 168
+items, 56 of them after sitting open a week or more. 161 trailers revise or build on an earlier
+decision, and 394 files cite an entry id at the point of use, most of them tests and source.
+The first tidies took the open lists from 85 to 5, 19 to 5, 17 to 0, and 41 to 24. The numbers,
+examples and limits are in [`docs/evidence.md`](docs/evidence.md).
+
 **On Windows.** Two of the six repositories, a hardware controller and a lab-experiment protocol,
 are worked from a Windows lab PC. Between them they have 237 commits since the ledger went in
 (9 and 14 September), 123 of them carrying ledger records, and 240 entries. The v1 digest and
