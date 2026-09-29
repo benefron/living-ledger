@@ -306,4 +306,5 @@ Do not hand-edit between the markers.
 | 2026-09-24 | D-afe8b13 | template v6 ships as release v6.0.0: the Windows fixes (hooks through bash, upgrade commits that keep the executable bit, LF writes) | `67879bb` |
 | 2026-09-29 | D-4a63728 | every hook reads git output, stdin and stdout as UTF-8 on every platform, whatever the system code page | `72aed6b` |
 | 2026-09-29 | D-17ae6df | template v7 ships as release v7.0.0: UTF-8 on every platform, and the evidence report | `0dddc25` |
+| 2026-09-29 | D-17260e7 | the commit gate logs every refusal for a re-proposed retired or rejected approach or a restated entry, and each tidy reports the count with the dead ends recall surfaced and Claude cited | `c65edec` |
 <!-- DECISIONS_LOG_END -->

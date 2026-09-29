@@ -128,6 +128,14 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-17260e7 · CLOSED · decision · evidence · 2026-09-29
+the commit gate logs every refusal for a re-proposed retired or rejected approach or a restated entry, and each tidy reports the count with the dead ends recall surfaced and Claude cited
+→ commit c65edec
+
+## F-ed5dba4 · STANDING · finding · evidence · 2026-09-29
+in four repositories to 2026-09-29, git history shows no re-litigation: two unlinked near-duplicate pairs among about 700 entries (neither a re-discovery), no decision revised back, no reopened entry, no revert
+→ commit c65edec
+
 ## D-17ae6df · CLOSED · decision · - · 2026-09-29
 template v7 ships as release v7.0.0: UTF-8 on every platform, and the evidence report
 → commit 0dddc25
@@ -192,6 +200,7 @@ each message the user types is matched against the whole ledger, and up to three
 ↔ 9bcbadc docs(decisions): the sha of D-add0c44
 ↔ 4de35d5 docs(changelog): v5
 ↔ 53b3576 docs: evidence of the ledger at work in four repositories
+↔ c65edec feat: count the re-proposals the ledger catches; the evidence report's assessment
 
 ## D-f4db0bf · CLOSED · decision · recall · 2026-09-24
 the recall threshold is recalibrated at /ledger-tidy from whether recalled ids were cited, in steps of 0.25 between 1.5 and 3.5 once 30 recalls are logged, and the change is committed to ledger.conf
