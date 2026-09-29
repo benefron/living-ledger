@@ -128,6 +128,14 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-4a63728 · CLOSED · decision · platform · 2026-09-29
+every hook reads git output, stdin and stdout as UTF-8 on every platform, whatever the system code page
+→ commit 72aed6b
+
+## F-f55e38a · CLOSED · finding · platform · 2026-09-29
+on Windows the merge driver and the sync decoded git output with the system code page and wrote mojibake into the ledger, which also split one entry into two ids
+→ commit 72aed6b
+
 ## D-afe8b13 · CLOSED · decision · - · 2026-09-24
 template v6 ships as release v6.0.0: the Windows fixes (hooks through bash, upgrade commits that keep the executable bit, LF writes)
 → commit 67879bb
@@ -135,6 +143,7 @@ template v6 ships as release v6.0.0: the Windows fixes (hooks through bash, upgr
 ## D-8db1c00 · CLOSED · decision · platform · 2026-09-24
 every ledger hook runs through bash, never by its executable bit, and every file the tool writes uses Unix line endings on every platform
 → commit e5fe0dd
+↔ 72aed6b fix: UTF-8 on every platform — no more mojibake in a ledger merged on Windows
 
 ## F-10dae2b · CLOSED · finding · platform · 2026-09-24
 hook scripts committed from a Windows checkout lost their executable bit, and on macOS and Linux clones the shim, the settings hooks and the digest skipped them silently, so there was no commit gate, sync or recall

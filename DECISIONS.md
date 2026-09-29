@@ -304,4 +304,5 @@ Do not hand-edit between the markers.
 | 2026-09-24 | D-216a12f | template v5 ships as release v5.0.0: prompt-time recall calibrated at tidy, ledger search, and Closes: by entry type | `4de35d5` |
 | 2026-09-24 | D-8db1c00 | every ledger hook runs through bash, never by its executable bit, and every file the tool writes uses Unix line endings on every platform | `e5fe0dd` |
 | 2026-09-24 | D-afe8b13 | template v6 ships as release v6.0.0: the Windows fixes (hooks through bash, upgrade commits that keep the executable bit, LF writes) | `67879bb` |
+| 2026-09-29 | D-4a63728 | every hook reads git output, stdin and stdout as UTF-8 on every platform, whatever the system code page | `72aed6b` |
 <!-- DECISIONS_LOG_END -->
