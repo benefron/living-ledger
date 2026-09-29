@@ -128,6 +128,10 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-17ae6df · CLOSED · decision · - · 2026-09-29
+template v7 ships as release v7.0.0: UTF-8 on every platform, and the evidence report
+→ commit 0dddc25
+
 ## F-a53793f · STANDING · finding · - · 2026-09-29
 across four repositories on 2026-09-29, 705 entries, 168 items closed by commits (56 after a week or more open), 161 Supersedes/Refs trailers and 394 files citing entry ids; first tidies cut open lists 85 to 5, 19 to 5, 17 to 0 and 41 to 24
 → commit 53b3576
@@ -143,6 +147,7 @@ on Windows the merge driver and the sync decoded git output with the system code
 ## D-afe8b13 · CLOSED · decision · - · 2026-09-24
 template v6 ships as release v6.0.0: the Windows fixes (hooks through bash, upgrade commits that keep the executable bit, LF writes)
 → commit 67879bb
+↔ 0dddc25 docs(changelog): v7
 
 ## D-8db1c00 · CLOSED · decision · platform · 2026-09-24
 every ledger hook runs through bash, never by its executable bit, and every file the tool writes uses Unix line endings on every platform

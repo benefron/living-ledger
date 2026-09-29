@@ -305,4 +305,5 @@ Do not hand-edit between the markers.
 | 2026-09-24 | D-8db1c00 | every ledger hook runs through bash, never by its executable bit, and every file the tool writes uses Unix line endings on every platform | `e5fe0dd` |
 | 2026-09-24 | D-afe8b13 | template v6 ships as release v6.0.0: the Windows fixes (hooks through bash, upgrade commits that keep the executable bit, LF writes) | `67879bb` |
 | 2026-09-29 | D-4a63728 | every hook reads git output, stdin and stdout as UTF-8 on every platform, whatever the system code page | `72aed6b` |
+| 2026-09-29 | D-17ae6df | template v7 ships as release v7.0.0: UTF-8 on every platform, and the evidence report | `0dddc25` |
 <!-- DECISIONS_LOG_END -->
