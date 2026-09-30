@@ -128,6 +128,10 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-e7010bd · CLOSED · decision · - · 2026-09-30
+the licence's copyright holder is Ben Efron
+→ commit 6411ffd
+
 ## D-17260e7 · CLOSED · decision · evidence · 2026-09-29
 the commit gate logs every refusal for a re-proposed retired or rejected approach or a restated entry, and each tidy reports the count with the dead ends recall surfaced and Claude cited
 → commit c65edec
