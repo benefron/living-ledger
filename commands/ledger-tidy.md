@@ -39,7 +39,9 @@ a `Closes:` that changed nothing (a finding closed while it was STANDING, before
 on one, or a decision / retired framing / note it never ends), overdue or aging items, similar
 entries (duplicate, refinement or contradiction), open items that
 mirror another register's item (`EXTERNAL_IDS`) beside that register's own status, empty entries,
-long-pinned entries, recent decisions with no written reasoning, stale rules, lint, and other
+long-pinned entries, recent decisions with no written reasoning, superseded decisions whose
+section in the decisions record has no `Superseded by` back-link (it still reads as current),
+stale rules, lint, and other
 files in the repo that keep their own lists (retired framings, concerns, status docs), and last,
 the **re-proposals caught** since the last tidy (commits the gate refused for re-adopting a
 retired or rejected approach or restating a live entry, and dead ends recall surfaced that were
@@ -66,6 +68,7 @@ Proposals, and how each is applied:
 | empty / id-only entry | `Supersedes: F-junk by F-real`, or reword by hand if the commit shows what it meant |
 | pinned too long | keep, or delete its `· Pinned` line |
 | no written reasoning | offer a `DECISIONS.md` section (the skill's template); "self-evident" is a fine answer |
+| superseded, section has no back-link | hand edit: append `**Superseded by:** <successor id> (<date>, <sha>) — <its text>` as the last paragraph of that section (check first that the report matched the right section — it shows the heading). The sync writes this line for every `Supersedes:` it applies; these are sections it could not have found then, or older supersessions |
 | stale rule | update or delete the file under `.claude/rules/` |
 | other registers | bring them in line with the ledger, or replace their lists with a pointer to it |
 | recall threshold | only when the report proposes a change: set `RECALL_MIN=<new>` in `.claude/ledger.conf`, and add `Decision: recall threshold <old> → <new> — <the report's reason and numbers>` |

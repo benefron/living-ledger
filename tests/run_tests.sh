@@ -59,7 +59,7 @@ check "merge driver registered"       "git -C '$R' config --get merge.ledger.dri
 check "settings.json valid, has digest" "python3 -c 'import json;d=json.load(open(\"$R/.claude/settings.json\"));assert \"digest.sh\" in json.dumps(d)'"
 check "registered in the index"       "ls '$LL_HOME_DIR'/ledger/repos/*.md >/dev/null 2>&1"
 check "user-level session hook added" "grep -q 'ledger-session.sh' '$LL_HOME_DIR/settings.json'"
-check "every stamp is v8" "! grep -rl 'ledger-template-version: [0-79]' '$R/.claude' '$R/.githooks' >/dev/null"
+check "every stamp is v9" "! grep -rl 'ledger-template-version: [0-8]' '$R/.claude' '$R/.githooks' >/dev/null"
 git -C "$R" add -A; commit "$R" "chore: install
 Ledger: none — installing the ledger tooling"
 
@@ -213,6 +213,198 @@ hc "$CG" -m "x" -m "Closes: $R2";   check "gate: Closes: on a retired framing ->
 hc "$CG" -m "fix: x" -m "Closes: $F2"; check "gate: Closes: on a STANDING finding -> accepted" "[ \$? -eq 0 ]"
 check "…and post-commit closes it" "grep -q \"^## $F2 · CLOSED\" '$CG/LEDGER.md'"
 check "validate (history only) does not judge Closes: targets" "python3 -c \"import sys; sys.path.insert(0,'$SKILL/templates/hooks'); from _ledger_parse import check_body; assert not check_body('x\n\nCloses: $D2', '$CG', 't', structural_only=True)\""
+
+# ---------------------------------------------------------------------------
+echo "5c. Supersedes: the superseded decision's section in the decisions record gets a back-link"
+check "matcher: text beats id, then a heading id, then the earliest; never a fence, the log, or a back-link line" "python3 - '$SKILL/templates/hooks' <<'PYM'
+import sys; sys.path.insert(0, sys.argv[1])
+from _ledger_parse import match_record_section as m
+t = '''# Record
+
+\`\`\`markdown
+## D-1111111 · inside a fence, not a section
+\`\`\`
+
+## A · a section that cites it in passing
+
+See D-1111111 for the history.
+
+### B · the one that quotes it
+
+**What was decided.** “The Encoder’s design
+is one   directory per run, with one file per population”.
+
+#### a sub-part stays in B
+
+## C (P5, D-1111111)
+
+## D · a section whose only mention is a back-link line
+
+**Superseded by:** D-2222222 (2026-01-01, abc1234) — something else
+
+## E · D-3333333
+
+| Date | Id |
+|---|---|
+<!-- DECISIONS_LOG_START -->
+| 2026-01-01 | D-4444444 | the encoder's design is one directory per run, with one file | x |
+<!-- DECISIONS_LOG_END -->
+
+## F · after the log, D-4444444
+'''
+txt = \"the encoder's design is one directory per run, with one file per population\"
+s = m(t, 'D-1111111', txt)
+assert s and s['heading'].startswith('### B'), s
+assert '#### a sub-part' in t[s['start']:s['end']], 'a level-4 heading stays inside its section'
+s = m(t, 'D-1111111', 'some words that appear nowhere in the record at all')
+assert s and s['heading'].startswith('## C'), s
+assert m(t, 'D-2222222', 'some words that appear nowhere in the record at all') is None
+e = m(t, 'D-3333333', 'some words that appear nowhere in the record at all')
+assert e and '| Date |' not in t[e['start']:e['end']], t[e['start']:e['end']]
+s = m(t, 'D-4444444', 'some words that appear nowhere in the record at all')
+assert s and s['heading'].startswith('## F'), s
+assert m(t, 'D-5555555', 'nothing') is None
+PYM"
+BL="$(newrepo backlink)"; installed "$BL"
+X1="the design's every declared input is a field of one record that travels from design to results"
+Y1='every declared input and every derived value is a field of one frozen record, written into each bundle'
+X2='rates are read in hertz everywhere downstream of the encoder'
+Y2='the decoder reads each event as its quantum, never as a rate'
+X3='the noise floor is measured from the spikes of a silent recording'
+Y3='the noise floor is declared as a sensor specification and propagated through the fields'
+X4='a decision that no section of the record describes at all'
+R5='a nightly batch job is good enough for the exports of the design'
+X6='the gate is binary and opens on any spike within the window'
+Y6a='the gate opens on SA activity alone'
+Y6b='RA activity sets the regime but never opens the gate'
+X1ID="$(hid D "$X1")"; Y1ID="$(hid D "$Y1")"; X2ID="$(hid D "$X2")"; Y2ID="$(hid D "$Y2")"
+X3ID="$(hid D "$X3")"; Y3ID="$(hid D "$Y3")"; X4ID="$(hid D "$X4")"; R5ID="$(hid R "$R5")"
+X6ID="$(hid D "$X6")"; Y6aID="$(hid D "$Y6a")"; Y6bID="$(hid D "$Y6b")"
+commit "$BL" "feat: first decisions
+
+Decision: $X1
+Decision: $X2
+Decision: $X3
+Decision: $X4
+Decision: $X6
+Retires: $R5"
+commit "$BL" "feat: a decision that will replace another
+
+Decision: $Y2"
+sync_ "$BL"
+python3 - "$BL/DECISIONS.md" "$X1" "$X2ID" "$X3" "$Y3ID" "$R5" "$X6" <<'PYX'
+import io, sys
+p, x1, x2id, x3, y3id, r5, x6 = sys.argv[1:8]
+q = x1.replace("'", '’')
+w = q.index(' ', 40)
+q = q[0].upper() + q[1:w] + '\n' + q[w + 1:]      # curly quote, capital, wrapped mid-sentence
+sec = f'''
+## 2.1 One record for every declared input · 2026-09-20
+
+**What was decided.** “{q}.”
+
+**Why.** One record, one place to look.
+
+### 2.2 Rates are in hertz (P5, {x2id})
+
+Downstream of the encoder everything is a rate; the decoder takes Hz.
+
+---
+
+### 2.3 The noise floor
+
+**What was decided.** {x3}. Planned here and enacted as {y3id}.
+
+## 2.4 Exports run nightly
+
+{r5}
+
+## 2.5 The spatial gate
+
+**What was decided.** {x6}.
+
+**Where it lives.** the gate module.
+'''
+s = io.open(p, encoding='utf-8').read()
+s = s.replace('<!-- SECTIONS_START -->', '<!-- SECTIONS_START -->\n' + sec, 1)
+io.open(p, 'w', encoding='utf-8', newline='\n').write(s)
+PYX
+git -C "$BL" add -A; commit "$BL" "docs: the decisions record
+Ledger: none — reasoning sections for decisions"
+sect() { awk -v h="$2" 'index($0, h) == 1 {p=1; print; next} /^#/{p=0} p' "$1/DECISIONS.md"; }
+logrows() { sed -n '/DECISIONS_LOG_START/,/DECISIONS_LOG_END/p' "$1/DECISIONS.md"; }
+logrows "$BL" > "$WORK/log0"
+commit "$BL" "feat: one frozen record
+
+Decision: $Y1
+Supersedes: $X1ID"
+sync_ "$BL"
+check "Supersedes: X's section gains exactly one back-link naming Y" "[ \"\$(sect '$BL' '## 2.1 ' | grep -c '^\*\*Superseded by:\*\* $Y1ID (')\" -eq 1 ]"
+check "…as '**Superseded by:** Y (date, sha) — Y's text'" "sect '$BL' '## 2.1 ' | grep -qE '^\*\*Superseded by:\*\* $Y1ID \([0-9]{4}-[0-9]{2}-[0-9]{2}, [0-9a-f]{7,}\) — every declared input and every derived value is a field'"
+check "…as the section's last paragraph, after one blank line" "sect '$BL' '## 2.1 ' | grep -v '^\$' | tail -1 | grep -q '^\*\*Superseded by:' && sect '$BL' '## 2.1 ' | grep -B1 '^\*\*Superseded by:' | head -1 | grep -qx ''"
+logrows "$BL" > "$WORK/log1"; diff "$WORK/log0" "$WORK/log1" > "$WORK/logdiff"
+check "the log gains only the new decision's row" "[ \"\$(grep -c '^[<>]' '$WORK/logdiff')\" -eq 1 ] && grep -q '^> .*$Y1ID' '$WORK/logdiff'"
+check "no other section is touched" "[ \"\$(grep -c '^\*\*Superseded by:\*\* D-[0-9a-f]' '$BL/DECISIONS.md')\" -eq 1 ]"
+cp "$BL/DECISIONS.md" "$WORK/d1"; sync_ "$BL"
+check "re-running the sync adds nothing" "cmp -s '$WORK/d1' '$BL/DECISIONS.md'"
+cp "$SKILL/templates/LEDGER.md" "$BL/LEDGER.md"; sync_ "$BL"
+check "a ledger re-derived from scratch adds no second back-link" "cmp -s '$WORK/d1' '$BL/DECISIONS.md'"
+commit "$BL" "chore(ledger): tidy
+
+Supersedes: $X2ID by $Y2ID
+Tidy: one decision folded into its successor"
+sync_ "$BL"
+check "Supersedes: X by Y — a section matched by the id alone" "sect '$BL' '### 2.2 ' | grep -q '^\*\*Superseded by:\*\* $Y2ID (.*) — the decoder reads each event as its quantum'"
+check "…written above the section's closing rule, not below it" "sect '$BL' '### 2.2 ' | awk '/^\*\*Superseded by/{a=NR} /^---/{b=NR} END{exit !(a && b && a < b)}'"
+commit "$BL" "feat: enact the noise floor
+
+Decision: $Y3
+Supersedes: $X3ID"
+sync_ "$BL"
+check "skip: a section that already names the successor gets no line" "! sect '$BL' '### 2.3 ' | grep -q 'Superseded by'"
+cp "$BL/DECISIONS.md" "$WORK/d2"
+commit "$BL" "feat: replace the undocumented decision
+
+Decision: a successor for the decision that no section describes
+Supersedes: $X4ID"
+sync_ "$BL"
+check "no section for X: the record gains only its log row, and no error" "grep -q \"^## $X4ID · SUPERSEDED\" '$BL/LEDGER.md' && [ \"\$(diff '$WORK/d2' '$BL/DECISIONS.md' | grep -c '^[<>]')\" -eq 1 ] && ! grep -q Traceback '$WORK/syncerr'"
+commit "$BL" "feat: revive the nightly exports
+
+Decision: run the exports as a nightly batch again, now that the design is stable
+Supersedes: $R5ID"
+sync_ "$BL"
+check "skip: a retired framing is not a decision — its section is left alone" "grep -q \"^## $R5ID · SUPERSEDED\" '$BL/LEDGER.md' && ! sect '$BL' '## 2.4 ' | grep -q 'Superseded by'"
+commit "$BL" "feat: split the gate
+
+Decision: $Y6a
+Decision: $Y6b
+Supersedes: $X6ID"
+sync_ "$BL"
+check "several decisions + a bare Supersedes: the back-link names them all, as the ledger does" "blk '$BL' $X6ID | grep -q \"superseded by $Y6aID, $Y6bID\" && sect '$BL' '## 2.5 ' | grep -q '^\*\*Superseded by:\*\* $Y6aID, $Y6bID ('"
+check "…above the rule and the log that follow the last section" "awk '/^\*\*Superseded by:\*\* $Y6aID/{a=NR} a && /^---\$/{b=NR} a && /^# Log/{c=NR; exit} END{exit !(a && b && c && a < b && b < c)}' '$BL/DECISIONS.md'"
+perl -0pi -e "s/\n\*\*Superseded by:\*\* $Y1ID[^\n]*\n//" "$BL/DECISIONS.md"
+sync_ "$BL"
+check "a back-link removed by hand is not put back (each change is applied once)" "! sect '$BL' '## 2.1 ' | grep -q 'Superseded by'"
+BLR() { python3 "$BL/.claude/hooks/_ledger_parse.py" tidy-report "$BL/LEDGER.md" "$BL" \
+  | awk '/^## Superseded decisions whose record section has no back-link/{p=1; print; next} /^## /{p=0} p'; }
+REP="$(BLR)"; EXP="add \"**Superseded by:** $Y1ID\" to its section in DECISIONS.md"
+check "tidy: a superseded decision whose section has no back-link is listed, with the line to add" "printf '%s' \"\$REP\" | grep \"^- $X1ID \" | grep -qF -- \"\$EXP\""
+check "tidy: …and not one whose section has it, or already names its successor" "! printf '%s' \"\$REP\" | grep -q \"$X2ID\\|$X3ID\\|$X6ID\\|$X4ID\\|$R5ID\""
+BP="$(newrepo backlinkhook)"; installed "$BP"
+hc "$BP" -m "feat: a" -m "Decision: $X1"
+python3 - "$BP/DECISIONS.md" "$X1" <<'PYX'
+import io, sys
+p, x1 = sys.argv[1:3]
+s = io.open(p, encoding='utf-8').read()
+s = s.replace('<!-- SECTIONS_START -->', f'<!-- SECTIONS_START -->\n\n## One record\n\n**What was decided.** {x1}.\n', 1)
+io.open(p, 'w', encoding='utf-8', newline='\n').write(s)
+PYX
+git -C "$BP" add -A; commit "$BP" "docs: record
+Ledger: none — a reasoning section for the decision"
+hc "$BP" -m "feat: b" -m "Decision: $Y1
+Supersedes: $X1ID"
+check "post-commit: the back-link is committed with the ledger, tree left clean" "ghas '^\*\*Superseded by:\*\* $Y1ID' -C '$BP' show HEAD:DECISIONS.md && ghas 'chore: ledger sync' -C '$BP' log -1 --format=%s && [ -z \"\$(git -C '$BP' status --porcelain)\" ]"
 
 # ---------------------------------------------------------------------------
 echo "6. stateless: every clone derives the same ledger"
@@ -377,7 +569,7 @@ C2="$WORK/clone2"; git clone -q "$B" "$C2"; cp "$SKILL/templates/LEDGER.md" "$C2
 check "a fresh clone derives identical ids" "[ \"\$(hdrs '$C2' | cut -d' ' -f2 | sort)\" = \"\$(hdrs '$B' | cut -d' ' -f2 | sort)\" ]"
 
 # ---------------------------------------------------------------------------
-echo "12. upgrades: v1 marker and v3 bookmark -> v8, nothing lost"
+echo "12. upgrades: v1 marker and v3 bookmark -> v9, nothing lost"
 U1="$(newrepo v1)"
 commit "$U1" "feat: old
 
@@ -418,7 +610,7 @@ U3="$(newrepo v3)"; installed "$U3"
 echo 'AUDIENCE_SURFACE=paper/main.tex' >> "$U3/.claude/ledger.conf"
 sed -i.bak '/^SYNC_FROM=/d' "$U3/.claude/ledger.conf"; rm -f "$U3/.claude/ledger.conf.bak"
 git -C "$U3" rev-parse --short HEAD > "$U3/.claude/.ledger-sync"
-perl -pi -e 's/ledger-template-version: 8/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
+perl -pi -e 's/ledger-template-version: 9/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
 git -C "$U3" add -A; commit "$U3" "x
 Ledger: none — simulate a v3 install"
 "$INSTALL" "$U3" --upgrade --quiet
@@ -433,12 +625,19 @@ python3 - "$U4/.claude/settings.json" <<'PYX'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p)); d['hooks'].pop('UserPromptSubmit', None); json.dump(d, open(p, 'w'))
 PYX
-perl -pi -e 's/ledger-template-version: 8/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
+perl -pi -e 's/ledger-template-version: 9/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
 git -C "$U4" add -A; commit "$U4" "x
 Ledger: none — simulate a v4 install"
-check "v4 repo: the digest offers the upgrade, naming recall" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE.*prompt-time recall'"
+check "v4 repo: the digest offers the upgrade to the version the skill ships" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v4; v9 is installed'"
 "$INSTALL" "$U4" --upgrade --quiet
-check "v4 -> v8: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
+check "v4 -> v9: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
+SHIPS="$(sed -n 's/.*ledger-template-version: \([0-9][0-9]*\).*/\1/p' "$SKILL/templates/ledger.conf" | head -1)"
+check "the version the skill ships (templates/ledger.conf) is the one install.sh stamps" "[ '$SHIPS' = \"\$(sed -n 's/^LL_TEMPLATE_VERSION=//p' '$INSTALL')\" ]"
+U8="$(newrepo v8)"; installed "$U8"
+perl -pi -e 's/ledger-template-version: 9/ledger-template-version: 8/' "$U8/.claude/ledger.conf" "$U8"/.claude/hooks/* "$U8"/.githooks/*
+git -C "$U8" add -A; commit "$U8" "x
+Ledger: none — simulate a v8 install"
+check "a v8 repo is offered v9, naming the decisions-record back-links" "digest '$U8' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v8; v9 is installed.*Superseded by'"
 
 DL="$(newrepo dotted)"; installed "$DL"
 python3 - "$DL/DECISIONS.md" <<'PYX'
@@ -804,7 +1003,7 @@ FM="$(newrepo filemode)"; git -C "$FM" config core.fileMode false
 Ledger: none — installing the ledger tooling"
 check "git ignoring exec bits (Windows): a fresh install still commits its scripts as 100755" "[ -z \"\$(git -C '$FM' ls-tree -r HEAD -- .claude/hooks .githooks | grep -v '_ledger_' | grep -v '^100755')\" ]"
 git -C "$FM" rm -q --cached .claude/hooks/ledger-recall.sh; rm -f "$FM/.claude/hooks/ledger-recall.sh"
-perl -pi -e 's/ledger-template-version: 8/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
+perl -pi -e 's/ledger-template-version: 9/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
 git -C "$FM" add -A; commit "$FM" "x
 Ledger: none — simulate a v5 install"
 printf 'mine\n' > "$FM/user.txt"; git -C "$FM" add user.txt

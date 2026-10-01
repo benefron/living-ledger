@@ -5,6 +5,31 @@ running an older template is flagged at session start with `LEDGER UPGRADE AVAIL
 `/ledger-init --upgrade` (or `install.sh <repo> --upgrade`) upgrades it in one commit without
 rewriting or renumbering any entry.
 
+## v9 — 2026-10-01
+
+From a real repo: 15 decisions were SUPERSEDED in the ledger, but only 2 of their sections in the
+decisions record said so. The rest still read as current.
+
+- **A superseded decision's section gets its back-link.** When the sync applies a `Supersedes:`
+  (`Supersedes: X` with the commit's new decisions, or `Supersedes: X by Y`), it finds X's prose
+  section in the decisions record and appends
+  `**Superseded by:** Y (<date>, <sha>) — <Y's ledger line, ≤ 120 chars>` as its last paragraph.
+  Several new decisions are all named, as in the ledger's `⤳` line. The post-commit hook commits
+  it with the ledger. A section is found outside the log markers: one that names X's id as a
+  token, or quotes the first ~60 characters of X's ledger line (whitespace, quotes and dashes
+  normalised). Of several, the text match wins, then the id in a heading, then the earliest.
+  Nothing is written when the section already names Y (a back-link written by hand, or a
+  planned-then-enacted section that already describes the survivor), when X is not a decision,
+  or when no section matches. Each back-link is written once, when the supersession is applied,
+  so a line removed by hand stays removed.
+- **The tidy report lists the ones still missing** ("Superseded decisions whose record section
+  has no back-link"): sections written after the supersession, ones the matcher could not find
+  then, and supersessions recorded before v9. Each proposal names the line to add.
+- **Fixed: repos were not offered v7 and v8.** The version the skill ships is read from
+  `templates/ledger.conf`, whose stamp had stayed at 6, so a v6 or v7 repo never saw
+  `LEDGER UPGRADE AVAILABLE`. Every template stamp is now 9, and a test checks that the shipped
+  version matches `install.sh`.
+
 ## v8 — 2026-09-29
 
 - **Re-proposals caught, counted.** The point of the ledger is that settled questions stay

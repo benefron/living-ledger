@@ -38,10 +38,12 @@ lost. This is the half that stops the question being re-opened in three months.>
 **Validation pending.** <what would still falsify or confirm this, or "none — settled">
 ```
 
-And on the section it replaces, add one line — nothing else changes:
+And on the section it replaces, one line is added — nothing else changes. `ledger-sync.sh` writes
+it when it applies the `Supersedes:` (it finds the section by its id or the quoted ledger line);
+write it by hand only when the tidy report says a section is still missing it:
 
 ```markdown
-**Superseded by:** D-xxxxxxx · <date>
+**Superseded by:** D-xxxxxxx (<date>, <sha>) — <the new decision's ledger line>
 ```
 
 ---

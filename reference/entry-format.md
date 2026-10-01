@@ -35,7 +35,7 @@ The separator between header fields is ` · ` (space, U+00B7, space).
 | `Action: <line>` | `A-…` | `action` | `OPEN` |
 | `Retires: <framing>` | `R-…` | `retired` | `STANDING` |
 | `Closes: <id>` | an open item, or a `STANDING` finding/action, → `CLOSED`, plus `✓ closed by <sha> <subject>`. Never a decision, retired framing or note: the gate refuses it (see below) | | |
-| `Supersedes: <id>` | that entry → `SUPERSEDED`, plus `⤳ superseded by <the commit's new decisions> in <sha>` | | |
+| `Supersedes: <id>` | that entry → `SUPERSEDED`, plus `⤳ superseded by <the commit's new decisions> in <sha>`; a decision's section in the decisions record gains `**Superseded by:** …` (see below) | | |
 | `Supersedes: <old> by <new>` | the same, naming the survivor — how a tidy folds a duplicate | | |
 | `Tidy: <summary>` | nothing; marks a tidy pass, from which "tidy due" counts again | | |
 | `Refs: <id>, …` | `↔ <sha> <subject>` on each; creates nothing | | |
@@ -105,7 +105,14 @@ room: append-only, every section dated and headed with the ledger id:
 **Validation pending.** <what would falsify it, or "none — settled">
 ```
 
-A superseded section is never deleted or edited — it gains `**Superseded by:** D-… · <date>`.
+A superseded section is never deleted or edited — it gains one line, as its last paragraph:
+`**Superseded by:** <successor ids> (<YYYY-MM-DD>, <sha>) — <the successor's text, ≤ 120 chars>`
+(`**Superseded by:** commit <sha> (<date>) — <subject>` when no decision replaced it). The sync
+writes it when it applies the `Supersedes:` — once — finding the section (outside the log) that
+names the id as a token or contains the first ~60 characters of the entry's text, whitespace and
+quotes normalised; of several, the text match, then the id in a heading, then the earliest. It
+skips a section that already names the successor by id or text, and anything not a decision.
+`/ledger-tidy` lists superseded decisions whose section still has no `Superseded by` line.
 Between `<!-- DECISIONS_LOG_START -->` and `<!-- DECISIONS_LOG_END -->` the sync appends one row
 per `Decision:`/`Retires:` automatically; do not hand-edit between the markers.
 

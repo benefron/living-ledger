@@ -52,7 +52,7 @@ In the **last paragraph** of a commit message, one per line (a long one may wrap
 | `Action: <one line>` | a to-do (pair with `Due:` / `Owner:`) | `A-…` OPEN |
 | `Retires: <framing>` | an approach that is now dead — never re-propose | `R-…` STANDING |
 | `Closes: <id>` | resolves an open item, or a finding recorded as a fact that turned out to be a problem — never a decision, retired framing or note (the gate refuses; use `Supersedes:` / `Refs:`) | → CLOSED, `✓ closed by <sha>` |
-| `Supersedes: <id>` | with a new `Decision:` — the old one is replaced; or `Supersedes: <old> by <new>` to fold a duplicate into its survivor | → SUPERSEDED, `⤳ superseded by` |
+| `Supersedes: <id>` | with a new `Decision:` — the old one is replaced; or `Supersedes: <old> by <new>` to fold a duplicate into its survivor | → SUPERSEDED, `⤳ superseded by`; its decisions-record section gains `**Superseded by:**` |
 | `Refs: <id>, <id>` | this commit relates to existing entries | `↔ <sha> <subject>` backlink |
 | `Ledger: none — <reason>` | explicit opt-out; reason ≥ 3 words | nothing |
 | `Tidy: <summary>` | marks a `/ledger-tidy` pass (see below) | nothing |
@@ -103,7 +103,10 @@ cited freely.
 5. For a decision, put the **why** in the commit body (that is Lore's level 2). Write a section
    in `DECISIONS.md` too when the reasoning is bigger than a commit body: what was decided
    (quoting the ledger line), why, what was rejected, where it lives, what is still unvalidated.
-   Append-only; a replaced section gains `**Superseded by:**`, never an edit.
+   Append-only; a replaced section gains `**Superseded by:**`, never an edit. The sync writes that
+   line itself when it applies the `Supersedes:` (it finds the section by the id or the quoted
+   ledger line, so quote it verbatim); a back-link you write in the same commit is kept, not
+   doubled. Sections it could not find show up in the tidy report.
 6. A directive that should outlive any one commit, or spans many files → propose a hand-written
    `.claude/rules/*.md` rule (the generated ones in `.claude/rules/ledger/` follow commits).
 

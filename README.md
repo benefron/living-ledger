@@ -118,8 +118,8 @@ In the **last paragraph** of a commit message, one per line (a long one may wrap
 | `Action: <line>` | a to-do | `A-…` OPEN |
 | `Retires: <framing>` | an approach that is dead — never re-propose | `R-…` STANDING |
 | `Closes: <id>` | resolves an open item or a finding (never a decision, retired framing or note) | → CLOSED |
-| `Supersedes: <id>` | with a `Decision:`: replaces an earlier decision | → SUPERSEDED |
-| `Supersedes: <old> by <new>` | folds a duplicate into its survivor | → SUPERSEDED |
+| `Supersedes: <id>` | with a `Decision:`: replaces an earlier decision | → SUPERSEDED; its `DECISIONS.md` section gains `**Superseded by:**` |
+| `Supersedes: <old> by <new>` | folds a duplicate into its survivor | → SUPERSEDED; same back-link |
 | `Refs: <id>, …` | relates this commit to existing entries | backlink |
 | `Ledger: none — <reason>` | the explicit opt-out (≥ 3 words of reason) | — |
 | `Tidy: <summary>` | marks a tidy pass | — |
@@ -169,6 +169,11 @@ repeats; this catches the rewordings.
   post-commit hook writes the ledger, and it commits what it writes.
 - **Level 2 is the commit body.** The *why* of a decision lives in the message that carried it;
   `DECISIONS.md` holds longer reasoning, append-only. See the three-levels table in the template.
+  When a `Supersedes:` replaces a decision, the sync finds that decision's section in
+  `DECISIONS.md` (by its id, or the ledger line it quotes) and appends
+  `**Superseded by:** <new id> (<date>, <sha>) — <its text>`, in the same auto-commit as the
+  ledger — so a replaced section never reads as current. It never edits the log, writes each
+  back-link once, and skips a section that already names the successor.
 
 ## Built on Lore — and usable by any agent
 
@@ -232,7 +237,8 @@ Claude offers it once, at a natural pause.
 
 `/ledger-tidy` builds a report of candidates — open items that read as settled, overdue and
 aging items, near-duplicates and possible contradictions, empty entries, long-pinned entries,
-decisions whose reasoning was never written, stale rules, and other files in the repo that keep
+decisions whose reasoning was never written, superseded decisions whose `DECISIONS.md` section has
+no `Superseded by` back-link, stale rules, and other files in the repo that keep
 their own lists — proposes a fix for each, and applies what you approve in one commit
 (`Closes:`, `Supersedes: <old> by <new>`, a few status edits, and a `Tidy:` trailer the next
 check counts from). Nothing is deleted: a tidy *compresses what is live* — what the digest shows

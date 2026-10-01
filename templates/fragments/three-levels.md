@@ -15,5 +15,6 @@ A decision that exists at level 1 only is a verdict with no argument behind it. 
 level 2 only is invisible to every future session. Both are incomplete.
 
 **Level 2 is append-only and keeps its history.** A superseded decision is never deleted and never
-edited: it gains a `**Superseded by:** <section / ledger id> · <date>` line, and the section that
-replaces it opens with `**Supersedes:** …`. The corrections *are* the record.
+edited: it gains a `**Superseded by:** <ledger id> (<date>, <sha>) — …` line (the sync writes it when
+it applies the `Supersedes:`), and the section that replaces it opens with `**Supersedes:** …`.
+The corrections *are* the record.
