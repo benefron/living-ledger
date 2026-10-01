@@ -128,6 +128,14 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-86bdfd2 · CLOSED · decision · - · 2026-10-01
+when the sync applies a Supersedes: to a decision, it appends a "**Superseded by:** <successor> (<date>, <sha>) — <its text>" back-link to that decision's prose section in the decisions record (found by id token or quoted ledger line, written once), and the tidy report lists superseded decisions whose section has none
+→ commit 42c6c01
+
+## F-a133988 · CLOSED · finding · - · 2026-10-01
+templates/ledger.conf carried template stamp 6, so the skill reported shipping v6 and repos at v6 or v7 were never offered the v7/v8 upgrade
+→ commit 42c6c01
+
 ## D-17260e7 · CLOSED · decision · evidence · 2026-09-29
 the commit gate logs every refusal for a re-proposed retired or rejected approach or a restated entry, and each tidy reports the count with the dead ends recall surfaced and Claude cited
 → commit c65edec
