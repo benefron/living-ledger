@@ -307,5 +307,6 @@ Do not hand-edit between the markers.
 | 2026-09-29 | D-4a63728 | every hook reads git output, stdin and stdout as UTF-8 on every platform, whatever the system code page | `72aed6b` |
 | 2026-09-29 | D-17ae6df | template v7 ships as release v7.0.0: UTF-8 on every platform, and the evidence report | `0dddc25` |
 | 2026-09-29 | D-17260e7 | the commit gate logs every refusal for a re-proposed retired or rejected approach or a restated entry, and each tidy reports the count with the dead ends recall surfaced and Claude cited | `c65edec` |
+| 2026-09-30 | D-e7010bd | the licence's copyright holder is Ben Efron | `6411ffd` |
 | 2026-10-01 | D-86bdfd2 | when the sync applies a Supersedes: to a decision, it appends a "**Superseded by:** <successor> (<date>, <sha>) — <its text>" back-link to that decision's prose section in the decisions record (found by id token or quoted ledger line, written once), and the tidy report lists superseded decisions whose section has none | `42c6c01` |
 <!-- DECISIONS_LOG_END -->

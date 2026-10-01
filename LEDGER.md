@@ -136,6 +136,10 @@ when the sync applies a Supersedes: to a decision, it appends a "**Superseded by
 templates/ledger.conf carried template stamp 6, so the skill reported shipping v6 and repos at v6 or v7 were never offered the v7/v8 upgrade
 → commit 42c6c01
 
+## D-e7010bd · CLOSED · decision · - · 2026-09-30
+the licence's copyright holder is Ben Efron
+→ commit 6411ffd
+
 ## D-17260e7 · CLOSED · decision · evidence · 2026-09-29
 the commit gate logs every refusal for a re-proposed retired or rejected approach or a restated entry, and each tidy reports the count with the dead ends recall surfaced and Claude cited
 → commit c65edec
