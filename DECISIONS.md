@@ -309,4 +309,5 @@ Do not hand-edit between the markers.
 | 2026-09-29 | D-17260e7 | the commit gate logs every refusal for a re-proposed retired or rejected approach or a restated entry, and each tidy reports the count with the dead ends recall surfaced and Claude cited | `c65edec` |
 | 2026-09-30 | D-e7010bd | the licence's copyright holder is Ben Efron | `6411ffd` |
 | 2026-10-01 | D-86bdfd2 | when the sync applies a Supersedes: to a decision, it appends a "**Superseded by:** <successor> (<date>, <sha>) — <its text>" back-link to that decision's prose section in the decisions record (found by id token or quoted ledger line, written once), and the tidy report lists superseded decisions whose section has none | `42c6c01` |
+| 2026-10-02 | D-1c2adde | when the sync applies a Supersedes: to a decision, it appends a written-once **Superseded by:** back-link to the section that records that decision — one that quotes its ledger line, has its id in the heading or a Decided label, or pairs the id with its sha — never to a section that only mentions the id; the tidy report lists superseded decisions whose recording section has none | `3e844a9` |
 <!-- DECISIONS_LOG_END -->
