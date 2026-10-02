@@ -130,22 +130,22 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 
 ## F-ad106de · CLOSED · finding · - · 2026-10-02
 the v9 sync wrote a superseded decision's back-link into the first section that merely mentioned its id, so another decision's section read as replaced
-→ commit 3e844a9
+→ commit 2342ec5
 
 ## D-1c2adde · CLOSED · decision · - · 2026-10-02
 when the sync applies a Supersedes: to a decision, it appends a written-once **Superseded by:** back-link to the section that records that decision — one that quotes its ledger line, has its id in the heading or a Decided label, or pairs the id with its sha — never to a section that only mentions the id; the tidy report lists superseded decisions whose recording section has none
 · Rejected: matching a section by the id anywhere in its text | in a real record 12 of 16 id-only matches were mentions inside other decisions' sections
 · Rejected: writing on a weak match and leaving the tidy to catch mistakes | the line is auto-committed into an append-only record, so a wrong one stands as a false statement until someone notices
-→ commit 3e844a9
+→ commit 2342ec5
 
 ## D-86bdfd2 · SUPERSEDED · decision · - · 2026-10-01
 when the sync applies a Supersedes: to a decision, it appends a "**Superseded by:** <successor> (<date>, <sha>) — <its text>" back-link to that decision's prose section in the decisions record (found by id token or quoted ledger line, written once), and the tidy report lists superseded decisions whose section has none
-→ commit 42c6c01
-⤳ superseded by D-1c2adde in 3e844a9 fix: a back-link only lands in the section that records the decision (template v10)
+→ commit 90690bf
+⤳ superseded by D-1c2adde in 2342ec5 fix: a back-link only lands in the section that records the decision (template v10)
 
 ## F-a133988 · CLOSED · finding · - · 2026-10-01
 templates/ledger.conf carried template stamp 6, so the skill reported shipping v6 and repos at v6 or v7 were never offered the v7/v8 upgrade
-→ commit 42c6c01
+→ commit 90690bf
 
 ## D-e7010bd · CLOSED · decision · - · 2026-09-30
 the licence's copyright holder is Ben Efron
