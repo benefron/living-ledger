@@ -128,6 +128,11 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-37e051c · CLOSED · decision · - · 2026-10-02
+the public write-up is docs/why-i-built-it.md, in Ben's own words and linked from the README; the launch posts (LinkedIn, Show HN, r/ClaudeAI, the Claude Developers Discord, X, a note to the Lore author) link to it and are kept outside the repository
+· Rejected: publishing the long "what broke" field report | its content is already in the README, the changelog, the Lore comparison and the evidence report
+→ commit 51501b0
+
 ## F-ad106de · CLOSED · finding · - · 2026-10-02
 the v9 sync wrote a superseded decision's back-link into the first section that merely mentioned its id, so another decision's section read as replaced
 → commit 2342ec5
