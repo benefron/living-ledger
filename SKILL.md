@@ -104,8 +104,10 @@ cited freely.
    in `DECISIONS.md` too when the reasoning is bigger than a commit body: what was decided
    (quoting the ledger line), why, what was rejected, where it lives, what is still unvalidated.
    Append-only; a replaced section gains `**Superseded by:**`, never an edit. The sync writes that
-   line itself when it applies the `Supersedes:` (it finds the section by the id or the quoted
-   ledger line, so quote it verbatim); a back-link you write in the same commit is kept, not
+   line itself when it applies the `Supersedes:`. It finds the section that quotes the ledger
+   line (so quote it verbatim), has the id in its heading or a `**Decided (…)**` label, or pairs
+   the id with its sha (``D-… · `<sha>` ``); a section that only mentions the id is never written
+   to. A back-link you write in the same commit is kept, not
    doubled. Sections it could not find show up in the tidy report.
 6. A directive that should outlive any one commit, or spans many files → propose a hand-written
    `.claude/rules/*.md` rule (the generated ones in `.claude/rules/ledger/` follow commits).

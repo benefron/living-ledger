@@ -109,9 +109,13 @@ A superseded section is never deleted or edited — it gains one line, as its la
 `**Superseded by:** <successor ids> (<YYYY-MM-DD>, <sha>) — <the successor's text, ≤ 120 chars>`
 (`**Superseded by:** commit <sha> (<date>) — <subject>` when no decision replaced it). The sync
 writes it when it applies the `Supersedes:` — once — finding the section (outside the log) that
-names the id as a token or contains the first ~60 characters of the entry's text, whitespace and
-quotes normalised; of several, the text match, then the id in a heading, then the earliest. It
-skips a section that already names the successor by id or text, and anything not a decision.
+records the decision: it contains the first ~60 characters of the entry's text (whitespace and
+quotes normalised), names the id in its heading or in a `**Decided (…)**` / `**Decision (…)**`
+label, or pairs the id with a sha (``D-056 · `c0f21ce` ``, as a "Ledger id + sha" line does). A
+section that only mentions the id in its prose is about another decision and is never written
+to. Of several, the text match, then the id in a heading, then the sha pairing, then the
+earliest. It skips a section that already names the successor by id or text, and anything not a
+decision.
 `/ledger-tidy` lists superseded decisions whose section still has no `Superseded by` line.
 Between `<!-- DECISIONS_LOG_START -->` and `<!-- DECISIONS_LOG_END -->` the sync appends one row
 per `Decision:`/`Retires:` automatically; do not hand-edit between the markers.

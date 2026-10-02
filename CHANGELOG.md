@@ -5,6 +5,20 @@ running an older template is flagged at session start with `LEDGER UPGRADE AVAIL
 `/ledger-init --upgrade` (or `install.sh <repo> --upgrade`) upgrades it in one commit without
 rewriting or renumbering any entry.
 
+## v10 — 2026-10-02
+
+- **Fixed: a back-link could land in the wrong section.** v9 fell back to the first section that
+  merely mentioned a superseded decision's id, so replacing a decision with no section of its
+  own wrote `**Superseded by:**` into another decision's section, which then read as replaced.
+  In a real record, 12 of the 16 sections that matched a live decision by id alone were such
+  mentions ("the cache D-022 called for is still open"). A section now counts only when it
+  records the decision: it quotes the ledger line, has the id in its heading or in a
+  `**Decided (…)**` label, or pairs the id with a sha (``D-056 · `c0f21ce` ``, as the template's
+  "Ledger id + sha" line does). A sha pairing outranks a label, which can name another
+  register's id ("Decided (the other repo's D-037 …)"). On that record, every pick that changed was
+  a mention that now matches nothing, or a correction to the right section. The tidy report uses
+  the same rule, so it no longer lists a decision whose only "section" was a mention.
+
 ## v9 — 2026-10-01
 
 From a real repo: 15 decisions were SUPERSEDED in the ledger, but only 2 of their sections in the

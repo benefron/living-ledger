@@ -170,7 +170,8 @@ repeats; this catches the rewordings.
 - **Level 2 is the commit body.** The *why* of a decision lives in the message that carried it;
   `DECISIONS.md` holds longer reasoning, append-only. See the three-levels table in the template.
   When a `Supersedes:` replaces a decision, the sync finds that decision's section in
-  `DECISIONS.md` (by its id, or the ledger line it quotes) and appends
+  `DECISIONS.md` (the one that quotes its ledger line, has its id in the heading, or pairs the
+  id with its sha — never one that only mentions the id) and appends
   `**Superseded by:** <new id> (<date>, <sha>) — <its text>`, in the same auto-commit as the
   ledger — so a replaced section never reads as current. It never edits the log, writes each
   back-link once, and skips a section that already names the successor.

@@ -39,7 +39,8 @@ lost. This is the half that stops the question being re-opened in three months.>
 ```
 
 And on the section it replaces, one line is added — nothing else changes. `ledger-sync.sh` writes
-it when it applies the `Supersedes:` (it finds the section by its id or the quoted ledger line);
+it when it applies the `Supersedes:` (it finds the section that quotes the ledger line, has the
+id in its heading, or pairs the id with its sha — keep the **Ledger id + sha** line below);
 write it by hand only when the tidy report says a section is still missing it:
 
 ```markdown

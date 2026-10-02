@@ -59,7 +59,8 @@ check "merge driver registered"       "git -C '$R' config --get merge.ledger.dri
 check "settings.json valid, has digest" "python3 -c 'import json;d=json.load(open(\"$R/.claude/settings.json\"));assert \"digest.sh\" in json.dumps(d)'"
 check "registered in the index"       "ls '$LL_HOME_DIR'/ledger/repos/*.md >/dev/null 2>&1"
 check "user-level session hook added" "grep -q 'ledger-session.sh' '$LL_HOME_DIR/settings.json'"
-check "every stamp is v9" "! grep -rl 'ledger-template-version: [0-8]' '$R/.claude' '$R/.githooks' >/dev/null"
+V="$(sed -n 's/^LL_TEMPLATE_VERSION=//p' "$INSTALL")"
+check "every stamp is the version install.sh ships (v$V)" "[ -z \"\$(grep -rhoE 'ledger-template-version: [0-9]+' '$R/.claude' '$R/.githooks' | sort -u | grep -vx 'ledger-template-version: $V')\" ]"
 git -C "$R" add -A; commit "$R" "chore: install
 Ledger: none — installing the ledger tooling"
 
@@ -265,6 +266,42 @@ s = m(t, 'D-4444444', 'some words that appear nowhere in the record at all')
 assert s and s['heading'].startswith('## F'), s
 assert m(t, 'D-5555555', 'nothing') is None
 PYM"
+check "matcher: a section that only mentions an id is not its section; one that pairs the id with its sha is" "python3 - '$SKILL/templates/hooks' <<'PYM'
+import sys; sys.path.insert(0, sys.argv[1])
+from _ledger_parse import match_record_section as m
+t = '''## 4.3 The operating point
+
+**Decided (the other repo's D-037, commit \`326ef6f\`).** Another register's decision with the same number.
+
+## D-aaaaaaa · a decision of its own
+
+**Why.** It replaces what D-bbbbbbb settled, and the cache D-ccccccc called for is still open.
+
+## 6.3 The parser is restored
+
+**Decided (P2, D-037).** The old parser comes back.
+
+**Ledger.** D-037 · \`5e54ad9\`; D-056 · commit \`c0f21ce\`. Related: D-031.
+
+### 2.1 One interface for the settings
+
+**Decided (P10, D-045 / D-062).** Every setting is read through one interface.
+
+**Why.** It replaces D-038, whose per-module reader drifted.
+'''
+none = 'some words that appear nowhere in the record at all'
+assert m(t, 'D-bbbbbbb', none) is None, 'cited in passing in another decision'
+assert m(t, 'D-ccccccc', none) is None, 'cited in passing in another decision'
+assert m(t, 'D-031', none) is None, 'a Related: mention on the Ledger line'
+assert m(t, 'D-038', none) is None, 'the successor section mentions what it replaced'
+for i in ('D-037', 'D-056'):
+    s = m(t, i, none)
+    assert s and s['heading'].startswith('## 6.3'), (i, s)
+for i in ('D-045', 'D-062'):
+    s = m(t, i, none)
+    assert s and s['heading'].startswith('### 2.1'), (i, s)
+assert m(t, 'D-aaaaaaa', none)['heading'].startswith('## D-aaaaaaa')
+PYM"
 BL="$(newrepo backlink)"; installed "$BL"
 X1="the design's every declared input is a field of one record that travels from design to results"
 Y1='every declared input and every derived value is a field of one frozen record, written into each bundle'
@@ -277,9 +314,12 @@ R5='a nightly batch job is good enough for the exports of the design'
 X6='the gate is binary and opens on any spike within the window'
 Y6a='the gate opens on SA activity alone'
 Y6b='RA activity sets the regime but never opens the gate'
+X7='the gate keeps its thresholds in one table beside the module'
+Y7='the gate thresholds move into the declared record'
 X1ID="$(hid D "$X1")"; Y1ID="$(hid D "$Y1")"; X2ID="$(hid D "$X2")"; Y2ID="$(hid D "$Y2")"
 X3ID="$(hid D "$X3")"; Y3ID="$(hid D "$Y3")"; X4ID="$(hid D "$X4")"; R5ID="$(hid R "$R5")"
 X6ID="$(hid D "$X6")"; Y6aID="$(hid D "$Y6a")"; Y6bID="$(hid D "$Y6b")"
+X7ID="$(hid D "$X7")"; Y7ID="$(hid D "$Y7")"
 commit "$BL" "feat: first decisions
 
 Decision: $X1
@@ -287,14 +327,15 @@ Decision: $X2
 Decision: $X3
 Decision: $X4
 Decision: $X6
+Decision: $X7
 Retires: $R5"
 commit "$BL" "feat: a decision that will replace another
 
 Decision: $Y2"
 sync_ "$BL"
-python3 - "$BL/DECISIONS.md" "$X1" "$X2ID" "$X3" "$Y3ID" "$R5" "$X6" <<'PYX'
+python3 - "$BL/DECISIONS.md" "$X1" "$X2ID" "$X3" "$Y3ID" "$R5" "$X6" "$X7ID" <<'PYX'
 import io, sys
-p, x1, x2id, x3, y3id, r5, x6 = sys.argv[1:8]
+p, x1, x2id, x3, y3id, r5, x6, x7id = sys.argv[1:9]
 q = x1.replace("'", '’')
 w = q.index(' ', 40)
 q = q[0].upper() + q[1:w] + '\n' + q[w + 1:]      # curly quote, capital, wrapped mid-sentence
@@ -323,7 +364,7 @@ Downstream of the encoder everything is a rate; the decoder takes Hz.
 
 **What was decided.** {x6}.
 
-**Where it lives.** the gate module.
+**Where it lives.** the gate module, beside the thresholds {x7id} keeps in one table.
 '''
 s = io.open(p, encoding='utf-8').read()
 s = s.replace('<!-- SECTIONS_START -->', '<!-- SECTIONS_START -->\n' + sec, 1)
@@ -375,6 +416,12 @@ Decision: run the exports as a nightly batch again, now that the design is stabl
 Supersedes: $R5ID"
 sync_ "$BL"
 check "skip: a retired framing is not a decision — its section is left alone" "grep -q \"^## $R5ID · SUPERSEDED\" '$BL/LEDGER.md' && ! sect '$BL' '## 2.4 ' | grep -q 'Superseded by'"
+commit "$BL" "feat: move the thresholds
+
+Decision: $Y7
+Supersedes: $X7ID"
+sync_ "$BL"
+check "skip: a section that only mentions X's id is not X's section — it gets no line" "grep -q \"^## $X7ID · SUPERSEDED\" '$BL/LEDGER.md' && ! sect '$BL' '## 2.5 ' | grep -q 'Superseded by'"
 commit "$BL" "feat: split the gate
 
 Decision: $Y6a
@@ -390,7 +437,7 @@ BLR() { python3 "$BL/.claude/hooks/_ledger_parse.py" tidy-report "$BL/LEDGER.md"
   | awk '/^## Superseded decisions whose record section has no back-link/{p=1; print; next} /^## /{p=0} p'; }
 REP="$(BLR)"; EXP="add \"**Superseded by:** $Y1ID\" to its section in DECISIONS.md"
 check "tidy: a superseded decision whose section has no back-link is listed, with the line to add" "printf '%s' \"\$REP\" | grep \"^- $X1ID \" | grep -qF -- \"\$EXP\""
-check "tidy: …and not one whose section has it, or already names its successor" "! printf '%s' \"\$REP\" | grep -q \"$X2ID\\|$X3ID\\|$X6ID\\|$X4ID\\|$R5ID\""
+check "tidy: …and not one whose section has it, or already names its successor" "! printf '%s' \"\$REP\" | grep -q \"$X2ID\\|$X3ID\\|$X6ID\\|$X4ID\\|$R5ID\\|$X7ID\""
 BP="$(newrepo backlinkhook)"; installed "$BP"
 hc "$BP" -m "feat: a" -m "Decision: $X1"
 python3 - "$BP/DECISIONS.md" "$X1" <<'PYX'
@@ -610,7 +657,7 @@ U3="$(newrepo v3)"; installed "$U3"
 echo 'AUDIENCE_SURFACE=paper/main.tex' >> "$U3/.claude/ledger.conf"
 sed -i.bak '/^SYNC_FROM=/d' "$U3/.claude/ledger.conf"; rm -f "$U3/.claude/ledger.conf.bak"
 git -C "$U3" rev-parse --short HEAD > "$U3/.claude/.ledger-sync"
-perl -pi -e 's/ledger-template-version: 9/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
+perl -pi -e 's/ledger-template-version: 10/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
 git -C "$U3" add -A; commit "$U3" "x
 Ledger: none — simulate a v3 install"
 "$INSTALL" "$U3" --upgrade --quiet
@@ -625,19 +672,24 @@ python3 - "$U4/.claude/settings.json" <<'PYX'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p)); d['hooks'].pop('UserPromptSubmit', None); json.dump(d, open(p, 'w'))
 PYX
-perl -pi -e 's/ledger-template-version: 9/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
+perl -pi -e 's/ledger-template-version: 10/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
 git -C "$U4" add -A; commit "$U4" "x
 Ledger: none — simulate a v4 install"
-check "v4 repo: the digest offers the upgrade to the version the skill ships" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v4; v9 is installed'"
+check "v4 repo: the digest offers the upgrade to the version the skill ships" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v4; v10 is installed'"
 "$INSTALL" "$U4" --upgrade --quiet
-check "v4 -> v9: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
+check "v4 -> v10: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
 SHIPS="$(sed -n 's/.*ledger-template-version: \([0-9][0-9]*\).*/\1/p' "$SKILL/templates/ledger.conf" | head -1)"
 check "the version the skill ships (templates/ledger.conf) is the one install.sh stamps" "[ '$SHIPS' = \"\$(sed -n 's/^LL_TEMPLATE_VERSION=//p' '$INSTALL')\" ]"
 U8="$(newrepo v8)"; installed "$U8"
-perl -pi -e 's/ledger-template-version: 9/ledger-template-version: 8/' "$U8/.claude/ledger.conf" "$U8"/.claude/hooks/* "$U8"/.githooks/*
+perl -pi -e 's/ledger-template-version: 10/ledger-template-version: 8/' "$U8/.claude/ledger.conf" "$U8"/.claude/hooks/* "$U8"/.githooks/*
 git -C "$U8" add -A; commit "$U8" "x
 Ledger: none — simulate a v8 install"
-check "a v8 repo is offered v9, naming the decisions-record back-links" "digest '$U8' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v8; v9 is installed.*Superseded by'"
+check "a v8 repo is offered v10, naming the decisions-record back-links" "digest '$U8' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v8; v10 is installed.*Superseded by'"
+U9="$(newrepo v9)"; installed "$U9"
+perl -pi -e 's/ledger-template-version: 10/ledger-template-version: 9/' "$U9/.claude/ledger.conf" "$U9"/.claude/hooks/* "$U9"/.githooks/*
+git -C "$U9" add -A; commit "$U9" "x
+Ledger: none — simulate a v9 install"
+check "a v9 repo is offered v10, naming the back-link fix" "digest '$U9' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v9; v10 is installed.*merely mentions the id'"
 
 DL="$(newrepo dotted)"; installed "$DL"
 python3 - "$DL/DECISIONS.md" <<'PYX'
@@ -1003,7 +1055,7 @@ FM="$(newrepo filemode)"; git -C "$FM" config core.fileMode false
 Ledger: none — installing the ledger tooling"
 check "git ignoring exec bits (Windows): a fresh install still commits its scripts as 100755" "[ -z \"\$(git -C '$FM' ls-tree -r HEAD -- .claude/hooks .githooks | grep -v '_ledger_' | grep -v '^100755')\" ]"
 git -C "$FM" rm -q --cached .claude/hooks/ledger-recall.sh; rm -f "$FM/.claude/hooks/ledger-recall.sh"
-perl -pi -e 's/ledger-template-version: 9/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
+perl -pi -e 's/ledger-template-version: 10/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
 git -C "$FM" add -A; commit "$FM" "x
 Ledger: none — simulate a v5 install"
 printf 'mine\n' > "$FM/user.txt"; git -C "$FM" add user.txt
