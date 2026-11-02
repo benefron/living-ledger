@@ -5,6 +5,25 @@ running an older template is flagged at session start with `LEDGER UPGRADE AVAIL
 `/ledger-init --upgrade` (or `install.sh <repo> --upgrade`) upgrades it in one commit without
 rewriting or renumbering any entry.
 
+## v11 — 2026-11-02
+
+From a real repo (pressure-simulation, a 76-item tidy): the report listed `- F-4b19474 · sparse bundles break the decoder
+path until Sensory…` and the person approving closes said it assumed they held the whole ledger in their head. The
+fault is in the tool: the id came first and carried the meaning, and the text was cut at 60 to 90 characters.
+
+- **The tidy report is written for a reader who remembers nothing.** Every row is the entry as a full sentence (up to 240
+  characters, then `…`), then why it was flagged and what to do, then the id in square brackets at the end, for lookup:
+  `- <the entry in words> — <why> → <what to do> [F-4b19474]`. "Opened in the same commit as D-…" now quotes the decision
+  in words (the first two, then "and N more"). A possible duplicate shows both entries in words, ids last.
+- **`/ledger-tidy` tells Claude to propose in the same way:** one plain standalone sentence per entry, terms defined on first
+  use, the proposal and reason in words, ids in the last column only (the table is `what it is, in plain words | proposal |
+  why | id`). This is the instruction text in `commands/ledger-tidy.md`; it reaches a repo with the command, not the upgrade.
+- Not changed: the session-start digest still lists open items id-first and truncated. It is a bounded list for Claude, not
+  something a person approves line by line.
+
+An upgrade is needed because the report's code is a per-repo copy (`.claude/hooks/_ledger_parse.py`). Nothing in a ledger is
+rewritten; `/ledger-init --upgrade` changes the hooks and the version stamps in one commit.
+
 ## v10 — 2026-10-02
 
 - **Fixed: a back-link could land in the wrong section.** v9 fell back to the first section that

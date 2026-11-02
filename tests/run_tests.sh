@@ -197,9 +197,9 @@ perl -0pi -e "s/(^## $DEC · CLOSED[^\n]*\n[^\n]*\n)/\$1✓ closed by 0000001 an
 noop() { python3 "$C/.claude/hooks/_ledger_parse.py" tidy-report "$C/LEDGER.md" "$C" \
   | awk '/^## A Closes: that changed nothing/{p=1; next} /^## /{p=0} p'; }
 REP="$(noop)"
-check "tidy: a STANDING finding with a ✓ line -> CLOSED" "printf '%s' \"\$REP\" | grep -q \"$LEG .*→ CLOSED\""
-check "tidy: a decision with a ✓ line -> Supersedes or keep" "printf '%s' \"\$REP\" | grep -q \"$DEC .*Supersedes: $DEC\""
-check "tidy: a retired framing a gate-skipping Closes: named" "printf '%s' \"\$REP\" | grep -q \"$RET .*Supersedes: $RET\""
+check "tidy: a STANDING finding with a ✓ line -> CLOSED" "printf '%s' \"\$REP\" | grep -q \"→ CLOSED.*\\[$LEG\\]\""
+check "tidy: a decision with a ✓ line -> Supersedes or keep" "printf '%s' \"\$REP\" | grep -q \"Supersedes: $DEC.*\\[$DEC\\]\""
+check "tidy: a retired framing a gate-skipping Closes: named" "printf '%s' \"\$REP\" | grep -q \"Supersedes: $RET.*\\[$RET\\]\""
 check "tidy: a finding closed, then re-opened by hand, is left alone" "! printf '%s' \"\$REP\" | grep -q \"$FACT\""
 perl -0pi -e "s/(^## $DEC · (?:.+\n)+)/\$1· tidied 2026-09-24: kept in force — that commit did not end it\n/m" "$C/LEDGER.md"
 REP="$(noop)"
@@ -436,7 +436,7 @@ check "a back-link removed by hand is not put back (each change is applied once)
 BLR() { python3 "$BL/.claude/hooks/_ledger_parse.py" tidy-report "$BL/LEDGER.md" "$BL" \
   | awk '/^## Superseded decisions whose record section has no back-link/{p=1; print; next} /^## /{p=0} p'; }
 REP="$(BLR)"; EXP="add \"**Superseded by:** $Y1ID\" to its section in DECISIONS.md"
-check "tidy: a superseded decision whose section has no back-link is listed, with the line to add" "printf '%s' \"\$REP\" | grep \"^- $X1ID \" | grep -qF -- \"\$EXP\""
+check "tidy: a superseded decision whose section has no back-link is listed, with the line to add" "printf '%s' \"\$REP\" | grep \"\\[$X1ID\\]\\$\" | grep -qF -- \"\$EXP\""
 check "tidy: …and not one whose section has it, or already names its successor" "! printf '%s' \"\$REP\" | grep -q \"$X2ID\\|$X3ID\\|$X6ID\\|$X4ID\\|$R5ID\\|$X7ID\""
 BP="$(newrepo backlinkhook)"; installed "$BP"
 hc "$BP" -m "feat: a" -m "Decision: $X1"
@@ -657,7 +657,7 @@ U3="$(newrepo v3)"; installed "$U3"
 echo 'AUDIENCE_SURFACE=paper/main.tex' >> "$U3/.claude/ledger.conf"
 sed -i.bak '/^SYNC_FROM=/d' "$U3/.claude/ledger.conf"; rm -f "$U3/.claude/ledger.conf.bak"
 git -C "$U3" rev-parse --short HEAD > "$U3/.claude/.ledger-sync"
-perl -pi -e 's/ledger-template-version: 10/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
+perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
 git -C "$U3" add -A; commit "$U3" "x
 Ledger: none — simulate a v3 install"
 "$INSTALL" "$U3" --upgrade --quiet
@@ -672,24 +672,29 @@ python3 - "$U4/.claude/settings.json" <<'PYX'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p)); d['hooks'].pop('UserPromptSubmit', None); json.dump(d, open(p, 'w'))
 PYX
-perl -pi -e 's/ledger-template-version: 10/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
+perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
 git -C "$U4" add -A; commit "$U4" "x
 Ledger: none — simulate a v4 install"
-check "v4 repo: the digest offers the upgrade to the version the skill ships" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v4; v10 is installed'"
+check "v4 repo: the digest offers the upgrade to the version the skill ships" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v4; v11 is installed'"
 "$INSTALL" "$U4" --upgrade --quiet
-check "v4 -> v10: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
+check "v4 -> v11: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
 SHIPS="$(sed -n 's/.*ledger-template-version: \([0-9][0-9]*\).*/\1/p' "$SKILL/templates/ledger.conf" | head -1)"
 check "the version the skill ships (templates/ledger.conf) is the one install.sh stamps" "[ '$SHIPS' = \"\$(sed -n 's/^LL_TEMPLATE_VERSION=//p' '$INSTALL')\" ]"
 U8="$(newrepo v8)"; installed "$U8"
-perl -pi -e 's/ledger-template-version: 10/ledger-template-version: 8/' "$U8/.claude/ledger.conf" "$U8"/.claude/hooks/* "$U8"/.githooks/*
+perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 8/' "$U8/.claude/ledger.conf" "$U8"/.claude/hooks/* "$U8"/.githooks/*
 git -C "$U8" add -A; commit "$U8" "x
 Ledger: none — simulate a v8 install"
-check "a v8 repo is offered v10, naming the decisions-record back-links" "digest '$U8' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v8; v10 is installed.*Superseded by'"
+check "a v8 repo is offered v11, naming the decisions-record back-links" "digest '$U8' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v8; v11 is installed.*Superseded by'"
 U9="$(newrepo v9)"; installed "$U9"
-perl -pi -e 's/ledger-template-version: 10/ledger-template-version: 9/' "$U9/.claude/ledger.conf" "$U9"/.claude/hooks/* "$U9"/.githooks/*
+perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 9/' "$U9/.claude/ledger.conf" "$U9"/.claude/hooks/* "$U9"/.githooks/*
 git -C "$U9" add -A; commit "$U9" "x
 Ledger: none — simulate a v9 install"
-check "a v9 repo is offered v10, naming the back-link fix" "digest '$U9' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v9; v10 is installed.*merely mentions the id'"
+check "a v9 repo is offered v11, naming the back-link fix" "digest '$U9' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v9; v11 is installed.*merely mentions the id'"
+U10="$(newrepo v10)"; installed "$U10"
+perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 10/' "$U10/.claude/ledger.conf" "$U10"/.claude/hooks/* "$U10"/.githooks/*
+git -C "$U10" add -A; commit "$U10" "x
+Ledger: none — simulate a v10 install"
+check "a v10 repo is offered v11, naming the plain-sentence tidy report" "digest '$U10' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v10; v11 is installed.*full plain sentence with its id last'"
 
 DL="$(newrepo dotted)"; installed "$DL"
 python3 - "$DL/DECISIONS.md" <<'PYX'
@@ -800,6 +805,9 @@ REP="$(CLAUDE_PROJECT_DIR="$T" python3 "$T/.claude/hooks/_ledger_parse.py" tidy-
 check "report: an open item opened with its decision" "printf '%s' \"\$REP\" | grep -q 'opened in the same commit as'"
 check "report: near-duplicate decisions"             "printf '%s' \"\$REP\" | grep -q \"$(hid D 'bust the cache on every deploy') ≈\\|≈ $(hid D 'bust the cache on every deploy')\""
 check "report: id-only junk"                         "printf '%s' \"\$REP\" | grep -A3 'Empty or id-only' | grep -q 'C-021'"
+check "report: a row ends with its id in brackets"   "printf '%s' \"\$REP\" | grep -E '^- .* \[[A-Z]-[0-9A-Za-z]+( ≈ [A-Z]-[0-9A-Za-z]+)?\]\$' | grep -q ."
+check "report: no row leads with an id"              "! printf '%s' \"\$REP\" | grep -qE '^- [A-Z]-[0-9A-Za-z]+ (·|≈)'"
+check "report: the decision an item was opened beside is quoted in words" "printf '%s' \"\$REP\" | grep -q 'opened in the same commit as the decision \"[^\"]*\" \\[[A-Z]-'"
 
 # ---------------------------------------------------------------------------
 echo "13d. worktrees, merges, and ids of another register"
@@ -1055,7 +1063,7 @@ FM="$(newrepo filemode)"; git -C "$FM" config core.fileMode false
 Ledger: none — installing the ledger tooling"
 check "git ignoring exec bits (Windows): a fresh install still commits its scripts as 100755" "[ -z \"\$(git -C '$FM' ls-tree -r HEAD -- .claude/hooks .githooks | grep -v '_ledger_' | grep -v '^100755')\" ]"
 git -C "$FM" rm -q --cached .claude/hooks/ledger-recall.sh; rm -f "$FM/.claude/hooks/ledger-recall.sh"
-perl -pi -e 's/ledger-template-version: 10/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
+perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
 git -C "$FM" add -A; commit "$FM" "x
 Ledger: none — simulate a v5 install"
 printf 'mine\n' > "$FM/user.txt"; git -C "$FM" add user.txt
