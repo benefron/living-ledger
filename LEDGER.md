@@ -128,13 +128,18 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-2f36a87 · CLOSED · decision · - · 2026-11-02
+the tidy report prints each entry as a full plain sentence with its id last, shipped as template v11 so repos pick it up by upgrading
+→ commit b6917e8
+
 ## D-956a8be · CLOSED · decision · commands · 2026-11-02
 a tidy batch is written in plain standalone sentences with the id in the last column, not id-first truncated lines
 → commit 471e16a
 
-## F-3be6eb2 · OPEN · finding · commands · 2026-11-02
+## F-3be6eb2 · CLOSED · finding · commands · 2026-11-02
 tidy-report's row layout (_ledger_parse.py, tidy_report) still prints id first and truncates the text; it should print a full plain sentence first and the id last (template change, tests, version bump, upgrade of installed repos)
 → commit 471e16a
+✓ closed by b6917e8 feat: the tidy report is written in plain words, ids last (template v11)
 
 ## F-ad106de · CLOSED · finding · - · 2026-10-02
 the v9 sync wrote a superseded decision's back-link into the first section that merely mentioned its id, so another decision's section read as replaced
