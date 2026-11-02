@@ -52,7 +52,20 @@ heuristics: read each entry (`grep -n -A6 '^## <id> '`) and, where needed, its c
 
 ## 2. Propose — in batches, one table per section
 
-| id | entry (short) | proposal | why |
+**Write for a reader who holds none of the ledger in their head.** The person approving cannot
+remember entry ids, `§` numbers, task or test shorthand (`T1a`, `Task 19`), or what "the review's
+section 9" said, and should not have to open the ledger or the decisions file to judge a close. So:
+
+- Say each entry in **one full plain sentence** that stands alone — what the question or decision
+  is and why it exists — not the truncated line the report prints.
+- Define a term of art the first time it appears in a message (a line, in words, is enough).
+- State the proposal and the reason in words (what it answers, what replaced it, what it costs to
+  close). Put evidence a person can check (a commit, a file) in the reason, not a bare id.
+- **Ids go in the last column, for lookup only** — never carry the meaning.
+- A group of entries that share one answer may share one row, described once.
+- If a batch will not fit that way, make the batch smaller.
+
+| what it is, in plain words | proposal | why | id |
 |---|---|---|---|
 
 Proposals, and how each is applied:
