@@ -12,6 +12,11 @@ priorities, a call made in a meeting, a deadline you are waiting on.
 Built on the **Lore** protocol — git commit trailers as a knowledge channel for AI coding agents
 (Stetsenko, [arXiv:2603.15566](https://arxiv.org/abs/2603.15566)).
 
+*Why I built it:* my research repositories had become lab notebooks — code, data pipelines,
+slides and a constant stream of decisions. My coding agent kept re-proposing ideas we had already
+rejected, the docs that held the decisions went stale, and keeping them current took more of my
+time than the research could spare. [The full story](docs/why-i-built-it.md).
+
 ## How you work with it
 
 **You work as usual. Claude keeps the ledger.**
@@ -305,41 +310,21 @@ Environment: `LEDGER_SKIP=1` (skip the gate and sync for one command), `LEDGER_D
 
 ## Field notes
 
-Developed and dogfooded across six real repositories — research code, a hardware controller, a
+Developed and dogfooded across six real repositories: research code, a hardware controller, a
 data pipeline, and a non-code planning workspace. In the research repository about half of the
-79 recorded decisions were not about code at all: scientific method (what is declared, what is
-measured and how), the scope of two papers and which repository owns what, what the slides may
-and may not claim, and how the project documents itself. They were captured because they
-travelled with committed docs and plans. The planning workspace is the counter-example: its work
-was never committed, so almost nothing was recorded — which is what the empty-commit path and
-`Due:`/`Action:`/`Pin:` are for. v4 is the result of auditing all six: it
-fixes id collisions between parallel branches and machines, trailers silently dropped when a line
-wrapped, "open" lists full of settled facts, auto-sync failing when `DECISIONS.md` was
-gitignored, `core.hooksPath` silently disabling Git LFS, and the digest leaking into headless
-pipeline calls. See [`CHANGELOG.md`](CHANGELOG.md) and this repo's own [`LEDGER.md`](LEDGER.md).
+79 recorded decisions were not about code at all (scientific method, the scope of two papers,
+what the slides may claim). They were captured because they travelled with committed docs and
+plans. The planning workspace, whose work was never committed, recorded almost nothing, which is
+what the empty-commit path and `Due:`/`Action:`/`Pin:` are for. Every version since v4 came from
+something that broke in those repositories; see [`CHANGELOG.md`](CHANGELOG.md).
 
-**A week later (29 September),** four of those ledgers held 705 entries. Commits had closed 168
-items, 56 of them after sitting open a week or more. 161 trailers revise or build on an earlier
-decision, and 394 files cite an entry id at the point of use, most of them tests and source.
-The first tidies took the open lists from 85 to 5, 19 to 5, 17 to 0, and 41 to 24. The numbers,
-examples and limits are in [`docs/evidence.md`](docs/evidence.md).
-
-**On Windows.** Two of the six repositories, a hardware controller and a lab-experiment protocol,
-are worked from a Windows lab PC. Between them they have 237 commits since the ledger went in
-(9 and 14 September), 123 of them carrying ledger records, and 240 entries. The v1 digest and
-sync ran there through September. On 24 September the upgrade to v5 ran there too: the upgrade
-commit, a merge through the ledger's merge driver, and the post-commit sync's automatic commit.
-Windows also exposed three bugs, fixed in v6 and v7:
-- Git on Windows ignores the executable bit, so the upgrade committed its new scripts
-  non-executable. On a Mac clone of those repositories, the shim that runs the commit gate
-  skipped a hook it could not execute, and did so silently. Hooks now run through `bash`, so the
-  bit no longer matters, and an upgrade commits its scripts as executable wherever it runs.
-- Python on Windows writes Windows line endings unless told not to, so the merge driver and the
-  sync turned one ledger CRLF, and the next sync on a Mac would have rewritten every line. Every
-  file is now written with Unix line endings.
-- Python on Windows also decodes git's output with the system code page, so the same merge wrote
-  30 lines of mojibake (`—` became `â€”`), found by the lab PC's first tidy. Fixed in v7: every
-  hook reads and writes UTF-8.
+**A month in (29 September),** four of those ledgers held 705 entries. Commits had closed 168
+items, 56 of them after sitting open a week or more, and 394 files cite an entry id at the point
+of use. Within a week the open lists went from 85 to 5, 19 to 5 and 17 to 0, most of it at the
+first tidy; the busiest repository's went from 41 to 24 at its tidy and has grown back with new
+work. Two of the repositories are worked from a Windows lab PC, which exposed three bugs fixed in
+v6 and v7 (executable bits, line endings, UTF-8). The numbers, examples and limits are in
+[`docs/evidence.md`](docs/evidence.md).
 
 ## Development
 
