@@ -128,6 +128,10 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## F-af3aa2a · CLOSED · finding · tests · 2026-11-18
+tidy-report row check was a timing-dependent CI failure on ubuntu (SIGPIPE under pipefail once the v11 report outgrew one grep buffer)
+→ commit d514003
+
 ## D-2f36a87 · CLOSED · decision · - · 2026-11-02
 the tidy report prints each entry as a full plain sentence with its id last, shipped as template v11 so repos pick it up by upgrading
 → commit b6917e8
