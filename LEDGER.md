@@ -437,3 +437,4 @@ sequential max+1 entry ids
 ## F-5eb5445 · OPEN · finding · - · 2026-09-23
 capture still needs a commit — a decision nobody states in a session never reaches the ledger
 → commit 9d9fbe4
+· tidied 2026-11-18: kept — still true; the skill's trigger phrases and the global empty-commit rule reduce it but nothing enforces it
