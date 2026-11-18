@@ -805,7 +805,7 @@ REP="$(CLAUDE_PROJECT_DIR="$T" python3 "$T/.claude/hooks/_ledger_parse.py" tidy-
 check "report: an open item opened with its decision" "printf '%s' \"\$REP\" | grep -q 'opened in the same commit as'"
 check "report: near-duplicate decisions"             "printf '%s' \"\$REP\" | grep -q \"$(hid D 'bust the cache on every deploy') ≈\\|≈ $(hid D 'bust the cache on every deploy')\""
 check "report: id-only junk"                         "printf '%s' \"\$REP\" | grep -A3 'Empty or id-only' | grep -q 'C-021'"
-check "report: a row ends with its id in brackets"   "printf '%s' \"\$REP\" | grep -E '^- .* \[[A-Z]-[0-9A-Za-z]+( ≈ [A-Z]-[0-9A-Za-z]+)?\]\$' | grep -q ."
+check "report: a row ends with its id in brackets"   "printf '%s' \"\$REP\" | grep -qE '^- .* \[[A-Z]-[0-9A-Za-z]+( ≈ [A-Z]-[0-9A-Za-z]+)?\]\$'"
 check "report: no row leads with an id"              "! printf '%s' \"\$REP\" | grep -qE '^- [A-Z]-[0-9A-Za-z]+ (·|≈)'"
 check "report: the decision an item was opened beside is quoted in words" "printf '%s' \"\$REP\" | grep -q 'opened in the same commit as the decision \"[^\"]*\" \\[[A-Z]-'"
 
