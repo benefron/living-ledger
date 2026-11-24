@@ -128,9 +128,14 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-812807d · CLOSED · decision · docs/superpowers · 2026-11-24
+the capture nudge is implemented natively in this session as seven test-first tasks, one commit each, all in _ledger_parse.py beside the recall code, and is not pushed until the owner says so
+→ commit 32740d1
+
 ## D-a9e7ae1 · CLOSED · decision · docs/superpowers · 2026-11-24
 capture is a message-scoring hook plus a lazy post-session transcript audit, both silent and measuring by default; the nudge is switched on at tidy only when sessions with decision-like exchanges mostly had no record commit
 → commit 9926f74
+↔ 32740d1 docs: implementation plan for the capture nudge, approved
 
 ## D-a6a9756 · CLOSED · decision · docs/superpowers · 2026-11-24
 the post-session audit runs from the digest and from tidy over ended sessions, not from a SessionEnd hook, which cannot show anything and does not run when a terminal is killed
