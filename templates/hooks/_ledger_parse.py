@@ -2142,6 +2142,16 @@ def _capture_rows(root, session):
     return [c for c in rows if len(c) == 6 and c[1] == session]
 
 
+def _capture_first(root, session, default):
+    """When this session's first message was logged (`default` if none)."""
+    for c in _capture_rows(root, session):
+        try:
+            return float(c[0])
+        except ValueError:
+            continue
+    return default
+
+
 def _capture_nudge_due(root, session, gap):
     """No nudge yet this session, or at least `gap` messages (this one included) since the last."""
     since = 1                                   # this message
@@ -2151,6 +2161,71 @@ def _capture_nudge_due(root, session, gap):
         if c[3] == 'prompt':
             since += 1
     return True
+
+
+def capture_covered(root, start, end):
+    """Did a ledger record land between `start` and `end` (epoch seconds, inclusive)? A record is a
+    commit carrying an entry trailer — Decision, Finding, Opens, Fixed, Action, Retires — read with
+    the shared trailer reader. `start` is floored to the second: git dates have 1 s resolution, the
+    log 0.1 s, so a commit made in the same second as the message counts."""
+    lo = int(start)
+    raw = _git(root, 'log', '--all', '--no-merges', '-n', '2000', '--format=%ct%x1f%B%x1e')
+    for rec in raw.split('\x1e'):
+        ts, _, body = rec.strip('\n').partition('\x1f')
+        try:
+            t = int(ts)
+        except ValueError:
+            continue
+        if lo <= t <= end and any(l.split(':', 1)[0] in KINDS for l in trailer_lines(body)):
+            return True
+    return False
+
+
+_AUDIT_RE = re.compile(r'human=(\d+);accepted=(\d+);covered=([01])')
+
+
+def capture_sessions(root):
+    """The capture log by session, since the last change to CAPTURE= in ledger.conf (older rows
+    were gathered under another mode): {session: {transcript, first, last, prompts, hits[(epoch,
+    cues)], nudges, audit (decision_like, accepted, covered) | None, told}}. First/last are the
+    first and last logged messages. Messages with no session id ('-') are left out."""
+    try:
+        raw = io.open(os.path.join(capture_dir(root) or '', 'log.tsv'), encoding='utf-8').read().splitlines()
+    except OSError:
+        return {}
+    since = _git(root, 'log', '-1', '--format=%ct', '-G', '^CAPTURE=', '--', '.claude/ledger.conf').strip()
+    since = float(since) if since.isdigit() else 0.0
+    out = {}
+    for line in raw:
+        c = line.split('\t')
+        if len(c) != 6 or c[1] == '-':
+            continue
+        try:
+            ts = float(c[0])
+        except ValueError:
+            continue
+        if ts < since:
+            continue
+        s = out.setdefault(c[1], {'transcript': '', 'first': ts, 'last': 0.0, 'prompts': 0, 'hits': [],
+                                  'nudges': 0, 'audit': None, 'told': False})
+        if c[2] and c[2] != '-':
+            s['transcript'] = c[2]
+        kind = c[3]
+        if kind == 'prompt':
+            s['prompts'] += 1
+            s['first'] = min(s['first'], ts)
+            s['last'] = max(s['last'], ts)
+        elif kind == 'hit':
+            s['hits'].append((ts, c[5]))
+        elif kind == 'nudge':
+            s['nudges'] += 1
+        elif kind == 'audit':
+            m = _AUDIT_RE.fullmatch(c[5])
+            if m:
+                s['audit'] = (int(m.group(1)), int(m.group(2)), m.group(3) == '1')
+        elif kind == 'told':
+            s['told'] = True
+    return out
 
 
 def cmd_capture_hook(argv):
@@ -2175,7 +2250,8 @@ def cmd_capture_hook(argv):
     text = ''
     if score >= min_score:
         rows.append((now, session, tr, 'hit', score, '|'.join(cues)))
-        if mode == 'nudge' and session != '-' and _capture_nudge_due(root, session, gap):
+        if mode == 'nudge' and session != '-' and _capture_nudge_due(root, session, gap) \
+                and not capture_covered(root, _capture_first(root, session, now), now):
             rows.append((now, session, tr, 'nudge', score, ''))
             text = CAPTURE_NUDGE
     _append_log(capture_dir(root), rows)

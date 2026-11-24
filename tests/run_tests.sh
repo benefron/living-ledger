@@ -1147,6 +1147,17 @@ check "capture nudge: the first hit nudges"                        "grep -q '^Le
 check "capture nudge: …the next prompt, inside the gap, is silent" "[ -z \"\$(cat '$WORK/c2')\" ]"
 check "capture nudge: …and once the gap has passed it nudges again" "grep -q '^Ledger capture' '$WORK/c3'"
 check "capture nudge: each nudge is logged"                        "[ \"\$(nrows nudge s2)\" = 2 ]"
+# once a record commit exists, the conversation is being captured: no nudge for it
+CH s5 "$HIT" > "$WORK/d1"
+commit "$CP" "x
+
+Decision: use the second option"
+CH s5 "$HIT" > "$WORK/d2"; CH s5 "$HIT" > "$WORK/d3"
+sleep 1.1
+CH s6 "$HIT" > "$WORK/d4"
+check "capture nudge: the first hit of a session nudges"                      "grep -q '^Ledger capture' '$WORK/d1'"
+check "capture nudge: …not once a record commit has landed, even past the gap" "[ -z \"\$(cat '$WORK/d3')\" ]"
+check "capture nudge: …but a session that began after that record still nudges" "grep -q '^Ledger capture' '$WORK/d4'"
 # a message with no session id can be counted but never nudged (it cannot be rate-limited)
 OUT="$(python3 -c 'import json; print(json.dumps({"prompt": "should we go with option a instead of option b for this?"}))' | ( cd "$CP" && "$CP/.claude/hooks/ledger-capture.sh" ))"
 check "capture: no session id → logged under -, never nudged"     "[ -z \"\$OUT\" ] && [ \"\$(nrows hit -)\" = 1 ]"
@@ -1164,6 +1175,55 @@ check "capture: a headless run is silent and logs nothing"        "[ -z \"\$OUT\
 perl -pi -e 's/^CAPTURE=.*/CAPTURE=off/' "$CP/.claude/ledger.conf"
 OUT="$(CH s4 "$HIT")"
 check "capture: CAPTURE=off is silent and logs nothing"            "[ -z \"\$OUT\" ] && [ \"\$(nrows prompt)\" = \"\$N0\" ]"
+
+# coverage: did a ledger record land in a stretch of time? Commits carry fixed dates.
+CV="$(newrepo capturecov)"; installed "$CV"; T=1700000000
+GIT_COMMITTER_DATE="$((T+100)) +0000" commit "$CV" "c1
+
+Decision: a record inside the first window"
+GIT_COMMITTER_DATE="$((T+200)) +0000" commit "$CV" "c2
+
+Ledger: none — nothing recorded here"
+GIT_COMMITTER_DATE="$((T+300)) +0000" commit "$CV" "c3
+
+Closes: F-0000000"
+GIT_COMMITTER_DATE="$((T+1000)) +0000" commit "$CV" "c4
+
+Finding: a record later on"
+GIT_COMMITTER_DATE="$((T+2000)) +0000" commit "$CV" "c5
+
+Opens: a record in the same second as a hit"
+check "capture covered: a Decision trailer inside the window counts"       "PYC \"assert p.capture_covered('$CV', $T+50, $T+150)\""
+check "capture covered: a commit with no record trailer does not"          "PYC \"assert not p.capture_covered('$CV', $T+150, $T+250)\""
+check "capture covered: Closes alone is not a record"                      "PYC \"assert not p.capture_covered('$CV', $T+250, $T+350)\""
+check "capture covered: a record outside the window does not count"        "PYC \"assert not p.capture_covered('$CV', $T+500, $T+900)\""
+check "capture covered: Finding and Opens count too"                       "PYC \"assert p.capture_covered('$CV', $T+900, $T+1100) and p.capture_covered('$CV', $T+1900, $T+2100)\""
+check "capture covered: a record in the same second as the hit counts"     "PYC \"assert p.capture_covered('$CV', $T+2000.4, $T+2060)\""
+
+# the log read back, per session; rows from before the last CAPTURE= change in ledger.conf drop out
+mkdir -p "$CV/.git/ledger-capture"
+TAB=$'\t'
+{ printf '%s\n' \
+  "$T.1${TAB}s1${TAB}/tmp/tr1${TAB}prompt${TAB}0${TAB}words=6" \
+  "$((T+10)).2${TAB}s1${TAB}/tmp/tr1${TAB}prompt${TAB}3${TAB}words=9" \
+  "$((T+10)).2${TAB}s1${TAB}/tmp/tr1${TAB}hit${TAB}3${TAB}should we|instead of" \
+  "$((T+20)).0${TAB}s1${TAB}/tmp/tr1${TAB}nudge${TAB}3${TAB}" \
+  "$((T+50)).0${TAB}s1${TAB}/tmp/tr1${TAB}audit${TAB}0${TAB}human=2;accepted=1;covered=0" \
+  "$((T+60)).0${TAB}s1${TAB}/tmp/tr1${TAB}told${TAB}0${TAB}" \
+  "$T.1${TAB}s2${TAB}/tmp/tr2${TAB}prompt${TAB}0${TAB}words=5" \
+  "$T.5${TAB}-${TAB}-${TAB}prompt${TAB}0${TAB}words=5"; } > "$CV/.git/ledger-capture/log.tsv"
+check "capture sessions: rows are grouped per session, '-' left out" "PYC \"s = p.capture_sessions('$CV'); assert set(s) == {'s1','s2'}, s; a = s['s1']; assert a['transcript'] == '/tmp/tr1' and a['prompts'] == 2 and a['nudges'] == 1 and a['told'] is True and a['first'] == $T+0.1 and a['last'] == $T+10.2, a; assert a['hits'] == [($T+10.2, 'should we|instead of')], a\""
+check "capture sessions: an audit row is read as (decision-like, accepted, covered)" "PYC \"s = p.capture_sessions('$CV'); assert s['s1']['audit'] == (2, 1, False) and s['s2']['audit'] is None and s['s2']['told'] is False\""
+CF="$(newrepo capturecut)"; installed "$CF"
+mkdir -p "$CF/.git/ledger-capture"
+{ printf '%s\n' \
+  "$((T+10)).0${TAB}old${TAB}/tmp/o${TAB}prompt${TAB}0${TAB}words=5" \
+  "$((T+500)).0${TAB}new${TAB}/tmp/n${TAB}prompt${TAB}0${TAB}words=5"; } > "$CF/.git/ledger-capture/log.tsv"
+printf 'CAPTURE=nudge\n' >> "$CF/.claude/ledger.conf"; git -C "$CF" add -A
+GIT_COMMITTER_DATE="$((T+100)) +0000" commit "$CF" "switch capture on
+
+Ledger: none — a settings change for the test"
+check "capture sessions: rows from before the last CAPTURE= change are dropped" "PYC \"assert set(p.capture_sessions('$CF')) == {'new'}\""
 
 # ---------------------------------------------------------------------------
 echo "14. the user-level session hook"
