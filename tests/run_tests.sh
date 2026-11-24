@@ -1274,6 +1274,38 @@ check "capture audit: a second run finds nothing new"                         "P
 check "capture audit: a record commit in the session's window marks it covered" "PYA '' \"assert s['sB']['audit'][2] is True and s['sA']['audit'][2] is False\""
 check "capture audit: the log holds counts, never the words"                  "! grep -q 'go with option a' '$CA/.git/ledger-capture/log.tsv'"
 
+# the report, in plain words, and what it proposes
+lrow "$((TA+20)).3" sA "$WORK/trA.jsonl" hit 5 'go with|instead of' >> "$CA/.git/ledger-capture/log.tsv"
+PYR() {  # PYR <min hits> <min sessions> <repo> <python using the report text t>
+  PYC "p.CAPTURE_MIN_HITS=$1; p.CAPTURE_MIN_SESSIONS=$2; t='\n'.join(p.capture_report('$3')); $4"; }
+CK="$(newrepo capturekeep)"; installed "$CK"; TK=1700400000
+mktr "$WORK/trK.jsonl" $TK "${SESS[@]}"; mkdir -p "$CK/.git/ledger-capture"
+{ lrow "$((TK+10)).0" sK "$WORK/trK.jsonl" prompt 0 words=3; lrow "$((TK+20)).0" sK "$WORK/trK.jsonl" prompt 5 words=9
+  lrow "$((TK+20)).1" sK "$WORK/trK.jsonl" hit 5 'go with|instead of'; } > "$CK/.git/ledger-capture/log.tsv"
+CL="$(newrepo capturecovered)"; installed "$CL"; TL=1700500000
+mktr "$WORK/trL.jsonl" $TL "${SESS[@]}"; mkdir -p "$CL/.git/ledger-capture"
+{ lrow "$((TL+10)).0" sL "$WORK/trL.jsonl" prompt 0 words=3; lrow "$((TL+20)).0" sL "$WORK/trL.jsonl" prompt 5 words=9
+  lrow "$((TL+20)).1" sL "$WORK/trL.jsonl" hit 5 'go with|instead of'; } > "$CL/.git/ledger-capture/log.tsv"
+GIT_COMMITTER_DATE="$((TL + 15)) +0000" commit "$CL" "x
+
+Decision: recorded while session L was running"
+check "capture report: too little data → keep measuring, and says how much more" "PYR 5 5 '$CK' \"assert 'Keep measuring' in t and '4 more hits' in t and 'CAPTURE=nudge' not in t, t\""
+check "capture report: most sessions ended with nothing recorded → set CAPTURE=nudge" "PYR 2 2 '$CA' \"assert 'CAPTURE=nudge' in t and 'Decision: capture nudge on' in t, t\""
+check "capture report: every session had a record → leave it measuring"           "PYR 1 1 '$CL' \"assert 'leave it' in t.lower() and 'CAPTURE=nudge' not in t, t\""
+check "capture report: a decision-like message is quoted from the transcript"     "PYR 2 2 '$CA' \"assert 'go with option a instead of b for now' in t, t\""
+check "capture report: an accepted proposal is quoted with its reply"             "PYR 2 2 '$CA' \"assert 'Which way do you want to go' in t, t\""
+check "capture report: the share of bare acceptances is stated"                    "PYR 2 2 '$CA' \"assert '50%' in t and 'bare' in t, t\""
+check "capture report: it says notes and thoughts cannot be seen"                  "PYR 2 2 '$CA' \"assert '/ledger-note' in t, t\""
+check "capture report: rows before the last CAPTURE= change are not counted"       "PYR 2 2 '$CF' \"assert '1 message counted' in t and '2 messages' not in t, t\""
+sync_ "$CA"
+python3 "$SKILL/templates/hooks/_ledger_parse.py" tidy-report "$CA/LEDGER.md" "$CA" > "$WORK/treport" 2>/dev/null
+python3 "$SKILL/templates/hooks/_ledger_parse.py" capture-stats "$CA" > "$WORK/cstats" 2>/dev/null
+python3 "$SKILL/templates/hooks/_ledger_parse.py" tidy-report "$CP/LEDGER.md" "$CP" > "$WORK/treport_off" 2>/dev/null
+python3 "$SKILL/templates/hooks/_ledger_parse.py" capture-stats "$CP" > "$WORK/cstats_off" 2>/dev/null
+check "capture report: the tidy report has a Capture section, headed by the mode" "grep -q '^## Capture (measuring)' '$WORK/treport'"
+check "capture report: capture-stats prints the same lines"                        "grep -q 'Keep measuring' '$WORK/cstats' && grep -q 'Keep measuring' '$WORK/treport'"
+check "capture report: CAPTURE=off puts nothing in either"                         "! grep -q 'Capture' '$WORK/treport_off' && [ ! -s '$WORK/cstats_off' ]"
+
 # ---------------------------------------------------------------------------
 echo "14. the user-level session hook"
 SESS="$SKILL/bin/ledger-session.sh"
