@@ -128,6 +128,15 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-a9e7ae1 · CLOSED · decision · docs/superpowers · 2026-11-24
+capture is a message-scoring hook plus a lazy post-session transcript audit, both silent and measuring by default; the nudge is switched on at tidy only when sessions with decision-like exchanges mostly had no record commit
+→ commit 9926f74
+
+## D-a6a9756 · CLOSED · decision · docs/superpowers · 2026-11-24
+the post-session audit runs from the digest and from tidy over ended sessions, not from a SessionEnd hook, which cannot show anything and does not run when a terminal is killed
+· Rejected: a model judging every turn | a model call per prompt, and it hands the judgment to the layer that is supposed to be missing these
+→ commit 9926f74
+
 ## F-af3aa2a · CLOSED · finding · tests · 2026-11-18
 tidy-report row check was a timing-dependent CI failure on ubuntu (SIGPIPE under pipefail once the v11 report outgrew one grep buffer)
 → commit d514003
@@ -438,3 +447,4 @@ sequential max+1 entry ids
 capture still needs a commit — a decision nobody states in a session never reaches the ledger
 → commit 9d9fbe4
 · tidied 2026-11-18: kept — still true; the skill's trigger phrases and the global empty-commit rule reduce it but nothing enforces it
+↔ 9926f74 docs: design for the capture nudge, approved

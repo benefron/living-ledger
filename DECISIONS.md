@@ -313,4 +313,6 @@ Do not hand-edit between the markers.
 | 2026-10-02 | D-37e051c | the public write-up is docs/why-i-built-it.md, in Ben's own words and linked from the README; the launch posts (LinkedIn, Show HN, r/ClaudeAI, the Claude Developers Discord, X, a note to the Lore author) link to it and are kept outside the repository | `51501b0` |
 | 2026-11-02 | D-956a8be | a tidy batch is written in plain standalone sentences with the id in the last column, not id-first truncated lines | `471e16a` |
 | 2026-11-02 | D-2f36a87 | the tidy report prints each entry as a full plain sentence with its id last, shipped as template v11 so repos pick it up by upgrading | `b6917e8` |
+| 2026-11-24 | D-a9e7ae1 | capture is a message-scoring hook plus a lazy post-session transcript audit, both silent and measuring by default; the nudge is switched on at tidy only when sessions with decision-like exchanges mostly had no record commit | `9926f74` |
+| 2026-11-24 | D-a6a9756 | the post-session audit runs from the digest and from tidy over ended sessions, not from a SessionEnd hook, which cannot show anything and does not run when a terminal is killed | `9926f74` |
 <!-- DECISIONS_LOG_END -->
