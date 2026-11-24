@@ -46,7 +46,7 @@ every clone and branch, so two machines or two branches can never hand out one i
 rebase or squash-merge leaves the id intact. Legacy sequential ids (`F-014`) are still parsed
 everywhere and never renumbered.
 
-ledger-template-version: 11
+ledger-template-version: 12
 """
 import datetime
 import hashlib
@@ -1827,7 +1827,11 @@ def recall_text(named, shown):
 
 
 def _log_recall(root, rows):
-    d = recall_dir(root)
+    _append_log(recall_dir(root), rows)
+
+
+def _append_log(d, rows):
+    """Append TSV rows to <d>/log.tsv, keeping the newest half once it passes 2 MB. Never raises."""
     if not d or not rows:
         return
     try:
@@ -2121,6 +2125,66 @@ def capture_score(prompt):
     return score, cues
 
 
+CAPTURE_NUDGE = (
+    "Ledger capture — this conversation looks like it is weighing directions or decisions. "
+    "When something is settled, or is still open and worth keeping, offer in one line to record it "
+    "(a `Decision:` or `Opens:` trailer on an empty commit, or `/ledger-note`). Do not interrupt to "
+    "ask: offer at a natural pause, once, and never commit it without the user's yes.")
+
+
+def _capture_rows(root, session):
+    """This session's rows from the capture log, oldest first, as lists of 6 columns."""
+    try:
+        raw = io.open(os.path.join(capture_dir(root) or '', 'log.tsv'), encoding='utf-8').read().splitlines()
+    except OSError:
+        return []
+    rows = [l.split('\t') for l in raw]
+    return [c for c in rows if len(c) == 6 and c[1] == session]
+
+
+def _capture_nudge_due(root, session, gap):
+    """No nudge yet this session, or at least `gap` messages (this one included) since the last."""
+    since = 1                                   # this message
+    for c in reversed(_capture_rows(root, session)):
+        if c[3] == 'nudge':
+            return since >= gap
+        if c[3] == 'prompt':
+            since += 1
+    return True
+
+
+def cmd_capture_hook(argv):
+    """UserPromptSubmit: the hook's JSON on stdin -> the hook's JSON on stdout, or nothing."""
+    import json
+    root = argv[0]
+    try:
+        inp = json.load(sys.stdin)
+        prompt = inp.get('prompt') or ''
+        session = re.sub(r'\s', '', str(inp.get('session_id') or '')) or '-'
+        tr = str(inp.get('transcript_path') or '')
+    except Exception:
+        return ''
+    mode, min_score, gap = capture_settings(root)
+    ledger = _ledger_path(root)
+    if mode == 'off' or not isinstance(prompt, str) or not capture_countable(prompt) \
+            or not ledger or not os.path.exists(ledger):
+        return ''
+    score, cues = capture_score(prompt)
+    now = round(datetime.datetime.now().timestamp(), 1)
+    rows = [(now, session, tr, 'prompt', score, f'words={len(prompt.split())}')]
+    text = ''
+    if score >= min_score:
+        rows.append((now, session, tr, 'hit', score, '|'.join(cues)))
+        if mode == 'nudge' and session != '-' and _capture_nudge_due(root, session, gap):
+            rows.append((now, session, tr, 'nudge', score, ''))
+            text = CAPTURE_NUDGE
+    _append_log(capture_dir(root), rows)
+    if not text:
+        return ''
+    return json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
+                                              "additionalContext": text}})
+
+
 def cmd_id(argv):
     return hash_id(argv[0], ' '.join(argv[1:]))
 
@@ -2138,7 +2202,8 @@ def main():
           'lint': cmd_lint, 'id': cmd_id, 'check-msg': cmd_check_msg,
           'tidy-status': cmd_tidy_status, 'tidy-report': cmd_tidy_report,
           'share-state': cmd_share_state, 'cli': cmd_cli,
-          'recall-hook': cmd_recall_hook, 'recall-stats': cmd_recall_stats}.get(mode)
+          'recall-hook': cmd_recall_hook, 'recall-stats': cmd_recall_stats,
+          'capture-hook': cmd_capture_hook}.get(mode)
     if fn is None:
         sys.exit(2)
     s = fn(rest)

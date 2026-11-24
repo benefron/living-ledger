@@ -5,7 +5,7 @@
 # per-repo hooks keep working on a clone that has never seen this skill. Keep it small,
 # dependency-free (git + coreutils only), and safe to source from any shell.
 #
-# ledger-template-version: 11
+# ledger-template-version: 12
 
 # Python reads stdin, stdout and git's output as UTF-8 on every platform. Without this, Python on
 # Windows decodes with the local code page and writes mojibake into the ledger ("—" -> "â€”").
@@ -327,6 +327,7 @@ ll_changes_since() {
 # ll_version_changes <version>  ->  one line naming what that version added
 ll_version_changes() {
   case "$1" in
+    12) printf '%s\n' "the capture nudge: each message you type is scored for exploring-or-deciding language, and this clone's git dir logs whether a ledger record followed (silent by default; nothing is committed and your words are never stored); /ledger-tidy reports it and proposes switching on a one-line nudge once decisions are going unrecorded" ;;
     11) printf '%s\n' "the tidy report prints each entry as a full plain sentence with its id last (it led with the id and cut the text short, so a person approving closes had to remember or look up what each id meant), names the decision an item was opened beside in words, and shows both entries of a possible duplicate in words" ;;
     10) printf '%s\n' "a superseded decision's back-link goes only into the section that records it — one that quotes its text, names its id in its heading or a **Decided** label, or pairs the id with its sha — never into a section that merely mentions the id" ;;
     9) printf '%s\n' "a superseded decision's section in the decisions record gets a **Superseded by:** back-link from the sync, in the commit that supersedes it, and the tidy report lists superseded decisions whose section still has none" ;;

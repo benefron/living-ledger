@@ -657,7 +657,7 @@ U3="$(newrepo v3)"; installed "$U3"
 echo 'AUDIENCE_SURFACE=paper/main.tex' >> "$U3/.claude/ledger.conf"
 sed -i.bak '/^SYNC_FROM=/d' "$U3/.claude/ledger.conf"; rm -f "$U3/.claude/ledger.conf.bak"
 git -C "$U3" rev-parse --short HEAD > "$U3/.claude/.ledger-sync"
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
 git -C "$U3" add -A; commit "$U3" "x
 Ledger: none — simulate a v3 install"
 "$INSTALL" "$U3" --upgrade --quiet
@@ -672,29 +672,34 @@ python3 - "$U4/.claude/settings.json" <<'PYX'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p)); d['hooks'].pop('UserPromptSubmit', None); json.dump(d, open(p, 'w'))
 PYX
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
 git -C "$U4" add -A; commit "$U4" "x
 Ledger: none — simulate a v4 install"
-check "v4 repo: the digest offers the upgrade to the version the skill ships" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v4; v11 is installed'"
+check "v4 repo: the digest offers the upgrade to the version the skill ships" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v4; v12 is installed'"
 "$INSTALL" "$U4" --upgrade --quiet
 check "v4 -> v11: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
 SHIPS="$(sed -n 's/.*ledger-template-version: \([0-9][0-9]*\).*/\1/p' "$SKILL/templates/ledger.conf" | head -1)"
 check "the version the skill ships (templates/ledger.conf) is the one install.sh stamps" "[ '$SHIPS' = \"\$(sed -n 's/^LL_TEMPLATE_VERSION=//p' '$INSTALL')\" ]"
 U8="$(newrepo v8)"; installed "$U8"
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 8/' "$U8/.claude/ledger.conf" "$U8"/.claude/hooks/* "$U8"/.githooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 8/' "$U8/.claude/ledger.conf" "$U8"/.claude/hooks/* "$U8"/.githooks/*
 git -C "$U8" add -A; commit "$U8" "x
 Ledger: none — simulate a v8 install"
-check "a v8 repo is offered v11, naming the decisions-record back-links" "digest '$U8' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v8; v11 is installed.*Superseded by'"
+check "a v8 repo is offered v12, naming the back-link fix" "digest '$U8' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v8; v12 is installed.*back-link'"
 U9="$(newrepo v9)"; installed "$U9"
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 9/' "$U9/.claude/ledger.conf" "$U9"/.claude/hooks/* "$U9"/.githooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 9/' "$U9/.claude/ledger.conf" "$U9"/.claude/hooks/* "$U9"/.githooks/*
 git -C "$U9" add -A; commit "$U9" "x
 Ledger: none — simulate a v9 install"
-check "a v9 repo is offered v11, naming the back-link fix" "digest '$U9' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v9; v11 is installed.*merely mentions the id'"
+check "a v9 repo is offered v12, naming the back-link fix" "digest '$U9' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v9; v12 is installed.*merely mentions the id'"
 U10="$(newrepo v10)"; installed "$U10"
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 10/' "$U10/.claude/ledger.conf" "$U10"/.claude/hooks/* "$U10"/.githooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 10/' "$U10/.claude/ledger.conf" "$U10"/.claude/hooks/* "$U10"/.githooks/*
 git -C "$U10" add -A; commit "$U10" "x
 Ledger: none — simulate a v10 install"
-check "a v10 repo is offered v11, naming the plain-sentence tidy report" "digest '$U10' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v10; v11 is installed.*full plain sentence with its id last'"
+check "a v10 repo is offered v12, naming the plain-sentence tidy report" "digest '$U10' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v10; v12 is installed.*full plain sentence with its id last'"
+U11="$(newrepo v11)"; installed "$U11"
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 11/' "$U11/.claude/ledger.conf" "$U11"/.claude/hooks/* "$U11"/.githooks/*
+git -C "$U11" add -A; commit "$U11" "x
+Ledger: none — simulate a v11 install"
+check "a v11 repo is offered v12, naming the capture nudge" "digest '$U11' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v11; v12 is installed.*capture'"
 
 DL="$(newrepo dotted)"; installed "$DL"
 python3 - "$DL/DECISIONS.md" <<'PYX'
@@ -1063,7 +1068,7 @@ FM="$(newrepo filemode)"; git -C "$FM" config core.fileMode false
 Ledger: none — installing the ledger tooling"
 check "git ignoring exec bits (Windows): a fresh install still commits its scripts as 100755" "[ -z \"\$(git -C '$FM' ls-tree -r HEAD -- .claude/hooks .githooks | grep -v '_ledger_' | grep -v '^100755')\" ]"
 git -C "$FM" rm -q --cached .claude/hooks/ledger-recall.sh; rm -f "$FM/.claude/hooks/ledger-recall.sh"
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
 git -C "$FM" add -A; commit "$FM" "x
 Ledger: none — simulate a v5 install"
 printf 'mine\n' > "$FM/user.txt"; git -C "$FM" add user.txt
@@ -1107,6 +1112,58 @@ check "capture: one decision cue counts double"        "PYC \"assert p.capture_s
 check "capture: small talk scores 0"                   "PYC \"assert p.capture_score('ok that sounds good, please run it again now')[0] == 0\""
 check "capture: slash, pasted and short are not countable" "PYC \"assert not any(p.capture_countable(s) for s in ['/ledger-tidy should we', '<pasted_content>should we</pasted_content>', 'should we go'])\""
 check "capture: mode defaults to measure, unknown too" "PYC \"import tempfile,os; d=tempfile.mkdtemp(); os.makedirs(d+'/.claude'); open(d+'/.claude/ledger.conf','w').write('CAPTURE=bogus\\n'); assert p.capture_settings(d)[0]=='measure'\""
+
+CP="$(newrepo capture)"; installed "$CP"
+commit "$CP" "a
+
+Decision: the capture tests need a ledger to exist"
+sync_ "$CP"
+LOG="$CP/.git/ledger-capture/log.tsv"
+HIT="should we go with option a instead of option b for this?"
+CH() {  # CH <session> <prompt> -> the hook's additionalContext ('' when silent)
+  python3 -c 'import json,sys; print(json.dumps({"session_id": sys.argv[1], "prompt": sys.argv[2], "transcript_path": ""}))' "$1" "$2" 2>/dev/null \
+    | ( cd "$CP" && "$CP/.claude/hooks/ledger-capture.sh" ) \
+    | python3 -c 'import json,sys; t=sys.stdin.read(); print(json.loads(t)["hookSpecificOutput"]["additionalContext"] if t.strip() else "")'
+}
+nrows() {  # nrows <kind> [session] -> how many log rows of that kind (and session)
+  if [ -f "$LOG" ]; then awk -F'\t' -v k="$1" -v s="${2:-}" '$4==k && (s=="" || $2==s){n++} END{print n+0}' "$LOG"; else echo 0; fi
+}
+check "capture: settings.json registers the hook"  "python3 -c 'import json;d=json.load(open(\"$CP/.claude/settings.json\"));assert \"ledger-capture.sh\" in json.dumps(d[\"hooks\"][\"UserPromptSubmit\"])'"
+check "capture: the hook is committed executable"  "ghas '^100755' -C '$CP' ls-files -s .claude/hooks/ledger-capture.sh"
+# measure mode (the default): silent, logging
+OUT="$(CH s1 "$HIT")"
+check "capture measure: a decision-like message gets no output"   "[ -z \"\$OUT\" ]"
+check "capture measure: …it logs one prompt and one hit"          "[ \"\$(nrows prompt s1)\" = 1 ] && [ \"\$(nrows hit s1)\" = 1 ]"
+check "capture measure: …and never the prompt's own words"        "! grep -q 'option b' '$LOG'"
+CH s1 "ok that sounds good, please run it again now" >/dev/null
+check "capture measure: small talk logs a prompt but no hit"      "[ \"\$(nrows prompt s1)\" = 2 ] && [ \"\$(nrows hit s1)\" = 1 ]"
+CH s1 "/ledger-tidy should we go with this one" >/dev/null; CH s1 "<pasted_content>should we go with this one</pasted_content>" >/dev/null; CH s1 "should we go" >/dev/null
+check "capture measure: slash, pasted and 3-word messages leave no rows" "[ \"\$(nrows prompt s1)\" = 2 ]"
+# nudge mode, one nudge per CAPTURE_GAP prompts
+printf 'CAPTURE=nudge\nCAPTURE_GAP=2\n' >> "$CP/.claude/ledger.conf"
+BASE_ST="$(git -C "$CP" status --porcelain)"
+CH s2 "$HIT" > "$WORK/c1"; CH s2 "$HIT" > "$WORK/c2"; CH s2 "$HIT" > "$WORK/c3"
+check "capture nudge: the first hit nudges"                        "grep -q '^Ledger capture' '$WORK/c1'"
+check "capture nudge: …the next prompt, inside the gap, is silent" "[ -z \"\$(cat '$WORK/c2')\" ]"
+check "capture nudge: …and once the gap has passed it nudges again" "grep -q '^Ledger capture' '$WORK/c3'"
+check "capture nudge: each nudge is logged"                        "[ \"\$(nrows nudge s2)\" = 2 ]"
+# a message with no session id can be counted but never nudged (it cannot be rate-limited)
+OUT="$(python3 -c 'import json; print(json.dumps({"prompt": "should we go with option a instead of option b for this?"}))' | ( cd "$CP" && "$CP/.claude/hooks/ledger-capture.sh" ))"
+check "capture: no session id → logged under -, never nudged"     "[ -z \"\$OUT\" ] && [ \"\$(nrows hit -)\" = 1 ]"
+# the failures a real prompt stream brings
+T0=$SECONDS
+python3 -c 'import json; print(json.dumps({"session_id": "big", "prompt": "should we go with this " * 9000, "transcript_path": ""}))' \
+  | ( cd "$CP" && "$CP/.claude/hooks/ledger-capture.sh" ) > "$WORK/big" 2>&1; BIGRC=$?
+check "capture: a 200 KB prompt is handled quietly and fast"      "[ \$BIGRC -eq 0 ] && [ \$((SECONDS - T0)) -le 2 ]"
+echo '{{ not json' | ( cd "$CP" && "$CP/.claude/hooks/ledger-capture.sh" ) > "$WORK/bad" 2>&1; BADRC=$?
+check "capture: unparseable hook input is silent and exits 0"      "[ \$BADRC -eq 0 ] && [ ! -s '$WORK/bad' ]"
+check "capture: the hook writes nothing outside the git dir"      "[ \"\$(git -C '$CP' status --porcelain)\" = \"\$BASE_ST\" ]"
+N0="$(nrows prompt)"
+OUT="$(CLAUDE_CODE_ENTRYPOINT=sdk-cli CH s3 "$HIT")"
+check "capture: a headless run is silent and logs nothing"        "[ -z \"\$OUT\" ] && [ \"\$(nrows prompt)\" = \"\$N0\" ]"
+perl -pi -e 's/^CAPTURE=.*/CAPTURE=off/' "$CP/.claude/ledger.conf"
+OUT="$(CH s4 "$HIT")"
+check "capture: CAPTURE=off is silent and logs nothing"            "[ -z \"\$OUT\" ] && [ \"\$(nrows prompt)\" = \"\$N0\" ]"
 
 # ---------------------------------------------------------------------------
 echo "14. the user-level session hook"
