@@ -1100,6 +1100,15 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+echo "13l. the capture nudge: scoring, hook, audit, report"
+PYC() { PYTHONDONTWRITEBYTECODE=1 python3 -c "import sys; sys.path.insert(0,'$SKILL/templates/hooks'); import _ledger_parse as p; $1"; }
+check "capture: a direction + an open cue score 2+"   "PYC \"assert p.capture_score('should we use option a instead of b?')[0] >= 2\""
+check "capture: one decision cue counts double"        "PYC \"assert p.capture_score(\\\"ok let's go with the second one\\\")[0] >= 2\""
+check "capture: small talk scores 0"                   "PYC \"assert p.capture_score('ok that sounds good, please run it again now')[0] == 0\""
+check "capture: slash, pasted and short are not countable" "PYC \"assert not any(p.capture_countable(s) for s in ['/ledger-tidy should we', '<pasted_content>should we</pasted_content>', 'should we go'])\""
+check "capture: mode defaults to measure, unknown too" "PYC \"import tempfile,os; d=tempfile.mkdtemp(); os.makedirs(d+'/.claude'); open(d+'/.claude/ledger.conf','w').write('CAPTURE=bogus\\n'); assert p.capture_settings(d)[0]=='measure'\""
+
+# ---------------------------------------------------------------------------
 echo "14. the user-level session hook"
 SESS="$SKILL/bin/ledger-session.sh"
 NL="$(newrepo noledger)"

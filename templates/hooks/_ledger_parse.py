@@ -2061,6 +2061,66 @@ def cmd_recall_stats(argv):
         or "No recalls logged in this clone yet."
 
 
+# --- capture nudge --------------------------------------------------------------
+# A conversation that explores or settles a decision reaches the ledger only if a commit follows,
+# and nothing noticed when it did not. A UserPromptSubmit hook scores each user message for
+# exploring-or-deciding language and logs it in the clone's git dir (never committed, and never the
+# prompt text); a lazy audit of ended sessions reads both sides of the transcript for what the
+# message hook cannot see; /ledger-tidy reports how often a record commit followed and proposes
+# switching CAPTURE=measure to nudge. See docs/superpowers/specs/2026-11-18-capture-nudge-design.md.
+
+CAPTURE_CUES = {
+    'direction': ('should we', 'what if', 'instead of', 'alternatively', 'which approach',
+                  'trade-off', 'tradeoff', 'which option', 'versus'),
+    'decision':  ("let's go with", 'we decided', 'scrap that', 'lock this in', "that's dead",
+                  'go with', 'changed my mind', 'final answer', "we're not doing", 'stop proposing'),
+    'open':      ('not sure', 'open question', 'do we need', 'how should we', 'worth it',
+                  'what do you think'),
+}
+CAPTURE_MIN_DEFAULT, CAPTURE_GAP_DEFAULT = 2, 10
+CAPTURE_MODES = ('measure', 'nudge', 'off')
+
+
+def capture_settings(root):
+    """-> (mode, min_score, gap). Anything unset or unrecognised is `measure`: silent, logging."""
+    def num(key, default):
+        try:
+            return int(float(_conf(root, key).strip('"\'') or default))
+        except ValueError:
+            return default
+    mode = _conf(root, 'CAPTURE').strip('"\'').lower()
+    return (mode if mode in CAPTURE_MODES else 'measure',
+            num('CAPTURE_MIN', CAPTURE_MIN_DEFAULT), num('CAPTURE_GAP', CAPTURE_GAP_DEFAULT))
+
+
+def capture_dir(root):
+    """Per-clone capture state, shared by the clone's worktrees; never committed."""
+    d = _git(root, 'rev-parse', '--git-common-dir').strip()
+    if not d:
+        return ''
+    return os.path.join(root, d, 'ledger-capture') if not os.path.isabs(d) else os.path.join(d, 'ledger-capture')
+
+
+def capture_countable(prompt):
+    """A message worth scoring: not a slash command, not pasted or system text, at least 4 words."""
+    s = (prompt or '').strip()
+    return len(s.split()) >= 4 and s[:1] not in ('/', '<')
+
+
+def capture_score(prompt):
+    """-> (score, cues): the distinct cue phrases a message contains; a decision cue counts 2."""
+    if not capture_countable(prompt):
+        return 0, []
+    low = prompt.lower().replace('’', "'")
+    score, cues = 0, []
+    for family, phrases in CAPTURE_CUES.items():
+        for ph in phrases:
+            if ph in low:
+                score += 2 if family == 'decision' else 1
+                cues.append(ph)
+    return score, cues
+
+
 def cmd_id(argv):
     return hash_id(argv[0], ' '.join(argv[1:]))
 
