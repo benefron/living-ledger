@@ -2409,6 +2409,33 @@ def cmd_capture_stats(argv):
     return "\n".join(capture_report(argv[0]))
 
 
+def capture_digest_note(root):
+    """The one line the next session's digest carries when the most recent audited session had
+    decision-like exchanges and no record commit: only in nudge mode, and once (a `told` row)."""
+    if capture_settings(root)[0] != 'nudge':
+        return ''
+    audited = [(s['last'], sid, s) for sid, s in capture_sessions(root).items() if s['audit']]
+    if not audited:
+        return ''
+    _, sid, s = max(audited, key=lambda a: a[0])
+    like, accepted, covered = s['audit']
+    n = like + accepted
+    if not n or covered or s['told']:
+        return ''
+    _append_log(capture_dir(root), [(round(datetime.datetime.now().timestamp(), 1), sid, s['transcript'], 'told', 0, '')])
+    return f"Last session: {n} decision-like exchange{'' if n == 1 else 's'}, no record commit \u2014 ask whether to record them."
+
+
+def cmd_capture_digest(argv):
+    """SessionStart: audit the newest few ended sessions (any mode but off), and in nudge mode
+    return the one line, or ''."""
+    root = argv[0]
+    if capture_settings(root)[0] == 'off':
+        return ''
+    capture_audit(root, limit=3)
+    return capture_digest_note(root)
+
+
 def cmd_capture_hook(argv):
     """UserPromptSubmit: the hook's JSON on stdin -> the hook's JSON on stdout, or nothing."""
     import json
@@ -2460,7 +2487,8 @@ def main():
           'tidy-status': cmd_tidy_status, 'tidy-report': cmd_tidy_report,
           'share-state': cmd_share_state, 'cli': cmd_cli,
           'recall-hook': cmd_recall_hook, 'recall-stats': cmd_recall_stats,
-          'capture-hook': cmd_capture_hook, 'capture-stats': cmd_capture_stats}.get(mode)
+          'capture-hook': cmd_capture_hook, 'capture-stats': cmd_capture_stats,
+          'capture-digest': cmd_capture_digest}.get(mode)
     if fn is None:
         sys.exit(2)
     s = fn(rest)

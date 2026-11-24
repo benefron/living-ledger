@@ -1306,6 +1306,38 @@ check "capture report: the tidy report has a Capture section, headed by the mode
 check "capture report: capture-stats prints the same lines"                        "grep -q 'Keep measuring' '$WORK/cstats' && grep -q 'Keep measuring' '$WORK/treport'"
 check "capture report: CAPTURE=off puts nothing in either"                         "! grep -q 'Capture' '$WORK/treport_off' && [ ! -s '$WORK/cstats_off' ]"
 
+# the next session's digest says when a decision slipped past (nudge mode); measure mode only audits
+krows() { awk -F'\t' -v k="$2" '$4==k{n++} END{print n+0}' "$1/.git/ledger-capture/log.tsv" 2>/dev/null || echo 0; }
+dg_repo() {  # dg_repo <name> <epoch> -> a ledger repo with one ended session (a proposal, a bare "a", a decision), no record
+  local r; r="$(newrepo "$1")"; installed "$r"
+  commit "$r" "a
+
+Decision: the digest tests need a ledger to exist"; sync_ "$r"
+  mktr "$WORK/tr$1.jsonl" "$2" "${SESS[@]}"; mkdir -p "$r/.git/ledger-capture"
+  { lrow "$(($2+10)).0" s1 "$WORK/tr$1.jsonl" prompt 0 words=3; lrow "$(($2+20)).0" s1 "$WORK/tr$1.jsonl" prompt 5 words=9; } > "$r/.git/ledger-capture/log.tsv"
+  printf '%s\n' "$r"
+}
+CD="$(dg_repo capturedigest 1700600000)"
+DG1="$(digest "$CD")"
+check "capture digest: measure mode says nothing, but audits the ended session" "[[ \"\$DG1\" != *'Last session'* ]] && [ \"\$(krows '$CD' audit)\" = 1 ]"
+printf 'CAPTURE=nudge\n' >> "$CD/.claude/ledger.conf"
+DG2="$(digest "$CD")"; DG3="$(digest "$CD")"
+check "capture digest: nudge mode names the unrecorded exchanges"              "[[ \"\$DG2\" == *'Last session: 2 decision-like exchanges, no record commit'* ]]"
+check "capture digest: …once"                                                  "[[ \"\$DG3\" != *'Last session'* ]] && [ \"\$(krows '$CD' told)\" = 1 ]"
+CD2="$(dg_repo capturedigestcov 1700700000)"; printf 'CAPTURE=nudge\n' >> "$CD2/.claude/ledger.conf"
+GIT_COMMITTER_DATE="$((1700700000 + 15)) +0000" commit "$CD2" "x
+
+Decision: recorded while the session ran"
+DG4="$(digest "$CD2")"
+check "capture digest: a session that had a record commit says nothing"        "[[ \"\$DG4\" != *'Last session'* ]] && [ \"\$(krows '$CD2' audit)\" = 1 ]"
+CD3="$(dg_repo capturedigestheadless 1700800000)"; printf 'CAPTURE=nudge\n' >> "$CD3/.claude/ledger.conf"
+DG5="$(CLAUDE_CODE_ENTRYPOINT=sdk-cli digest "$CD3")"
+check "capture digest: a headless run is silent and audits nothing"            "[ -z \"\$DG5\" ] && [ \"\$(krows '$CD3' audit)\" = 0 ]"
+CD4="$(dg_repo capturedigestbig 1700900000)"; printf 'CAPTURE=nudge\n' >> "$CD4/.claude/ledger.conf"
+python3 -c 'import json,sys; l=json.dumps({"type":"user","timestamp":"2023-11-25T08:00:00Z","message":{"content":"x"}})+"\n"; sys.stdout.write(l*(6000000//len(l)+1))' > "$WORK/trcapturedigestbig.jsonl"
+T0=$SECONDS; DG6="$(digest "$CD4")"
+check "capture digest: a 6 MB transcript is skipped, quickly, without an audit"  "[ \"\$(krows '$CD4' audit)\" = 0 ] && [ \$((SECONDS - T0)) -le 8 ] && [[ \"\$DG6\" != *'Last session'* ]]"
+
 # ---------------------------------------------------------------------------
 echo "14. the user-level session hook"
 SESS="$SKILL/bin/ledger-session.sh"

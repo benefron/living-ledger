@@ -166,6 +166,12 @@ TIDY="$(PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/_ledger_parse.py" tidy-status "
 - Tidy due: $TIDY. Offer \`/ledger-tidy\` once, at a natural pause — not mid-task (it triages \
 open items, folds duplicates, fixes stale rules; ~10 minutes of the user's review)."
 
+# --- did the last session leave decisions unrecorded? (the audit runs in every mode but off;
+# the line shows only with CAPTURE=nudge, once) ---------------------------------------------
+CAP="$(PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/_ledger_parse.py" capture-digest "$REPO" 2>/dev/null || true)"
+[ -n "$CAP" ] && NOTES="$NOTES
+- $CAP"
+
 STALE="$(PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/_ledger_parse.py" stale-rules "$VIEW" "$REPO/.claude/rules" 2>/dev/null || true)"
 rm -f "$VIEW"
 if [ -n "$STALE" ]; then
