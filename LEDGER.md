@@ -137,6 +137,7 @@ capture is a message-scoring hook plus a lazy post-session transcript audit, bot
 → commit 9926f74
 ↔ 32740d1 docs: implementation plan for the capture nudge, approved
 ↔ 1552874 feat: capture scoring — cue lexicon, settings, countable messages
+↔ 7e696ef feat: the capture hook, silent by default (template v12)
 
 ## D-a6a9756 · CLOSED · decision · docs/superpowers · 2026-11-24
 the post-session audit runs from the digest and from tidy over ended sessions, not from a SessionEnd hook, which cannot show anything and does not run when a terminal is killed
