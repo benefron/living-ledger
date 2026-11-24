@@ -1118,6 +1118,7 @@ commit "$CP" "a
 
 Decision: the capture tests need a ledger to exist"
 sync_ "$CP"
+sleep 1.1       # a record in the same second as a message counts as covering it (by design): start a second later
 LOG="$CP/.git/ledger-capture/log.tsv"
 HIT="should we go with option a instead of option b for this?"
 CH() {  # CH <session> <prompt> -> the hook's additionalContext ('' when silent)
@@ -1224,6 +1225,54 @@ GIT_COMMITTER_DATE="$((T+100)) +0000" commit "$CF" "switch capture on
 
 Ledger: none — a settings change for the test"
 check "capture sessions: rows from before the last CAPTURE= change are dropped" "PYC \"assert set(p.capture_sessions('$CF')) == {'new'}\""
+
+# the audit: what the message hook cannot see, read back from the transcript of an ended session
+check "capture audit: an offer accepted with a bare 'a' is an accepted proposal" "PYC \"assert p.decision_turns([(1,'agent','Which way do you want to go? My recommendation is A.'),(2,'human','a')]) == (0,1)\""
+check "capture audit: 'Approved.' after a request for approval counts"           "PYC \"assert p.decision_turns([(1,'agent','Please approve the design.'),(2,'human','Approved.')]) == (0,1)\""
+check "capture audit: a reply with no proposal before it is not an acceptance"   "PYC \"assert p.decision_turns([(1,'agent','Done. Tests pass.'),(2,'human','a')]) == (0,0)\""
+check "capture audit: a long reply is not a bare acceptance"                     "PYC \"assert p.decision_turns([(1,'agent','Which way?'),(2,'human','yes please go ahead with it now')]) == (0,0)\""
+check "capture audit: nor is one that follows another agent turn"                "PYC \"assert p.decision_turns([(1,'agent','Which way?'),(2,'agent','Working on it.'),(3,'human','ok')]) == (0,0)\""
+check "capture audit: a decision-like human turn is counted"                     "PYC \"assert p.decision_turns([(1,'human',\\\"let's go with option a instead of b\\\")]) == (1,0)\""
+
+CA="$(newrepo captureaudit)"; installed "$CA"
+TA=1700100000; TF=1700200000; TB=1700250000; TC=1700300000; TD=1700000500; NOWA=$((TC + 100))
+mktr() {  # mktr <file> <epoch> <role:text>... -> a transcript, one turn per argument, 10 s apart
+  python3 - "$@" <<'PYEOF'
+import datetime, json, sys
+out, t = sys.argv[1], float(sys.argv[2])
+with open(out, 'w', encoding='utf-8') as f:
+    for i, a in enumerate(sys.argv[3:]):
+        role, _, text = a.partition(':')
+        ts = datetime.datetime.fromtimestamp(t + 10 * i, datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
+        if role == 'agent':
+            f.write(json.dumps({"type": "assistant", "timestamp": ts, "message": {"content": [{"type": "text", "text": text}]}}) + '\n')
+        else:
+            f.write(json.dumps({"type": "user", "timestamp": ts, "message": {"content": text}}) + '\n')
+PYEOF
+}
+SESS=(agent:'Which way do you want to go? My recommendation is A.' human:a "human:let's go with option a instead of b for now")
+mktr "$WORK/trA.jsonl" $TA "${SESS[@]}"; mktr "$WORK/trB.jsonl" $TB "${SESS[@]}"; mktr "$WORK/trF.jsonl" $TF "${SESS[@]}"
+printf '{"type":"user","timestamp":"20' >> "$WORK/trF.jsonl"                  # a half-written last line
+GIT_COMMITTER_DATE="$((TB + 15)) +0000" commit "$CA" "x
+
+Decision: a record made while session B was running"
+mkdir -p "$CA/.git/ledger-capture"
+lrow() { printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$@"; }
+{ lrow "$((TA+10)).0" sA "$WORK/trA.jsonl" prompt 0 words=3;  lrow "$((TA+20)).0" sA "$WORK/trA.jsonl" prompt 4 words=9
+  lrow "$((TB+10)).0" sB "$WORK/trB.jsonl" prompt 0 words=3;  lrow "$((TB+20)).0" sB "$WORK/trB.jsonl" prompt 4 words=9
+  lrow "$((TF+10)).0" sF "$WORK/trF.jsonl" prompt 0 words=3;  lrow "$((TF+20)).0" sF "$WORK/trF.jsonl" prompt 4 words=9
+  lrow "$((TC+10)).0" sC "$WORK/trC.jsonl" prompt 0 words=6                                    # still running at NOWA
+  lrow "$((TD+10)).0" sD "$WORK/no-such-transcript.jsonl" prompt 0 words=6                        # transcript is gone
+  lrow "$((TD+20)).0" sE - prompt 0 words=6; } > "$CA/.git/ledger-capture/log.tsv"                # no transcript path at all
+mktr "$WORK/trC.jsonl" $TC "${SESS[@]}"
+PYA() { PYC "import sys; r=p.capture_audit('$CA', now=$NOWA$1); s=p.capture_sessions('$CA'); $2"; }
+check "capture audit: a transcript over the size cap is skipped, not read"   "PYA ', max_bytes=10' \"assert r == 0 and all(v['audit'] is None for v in s.values())\""
+check "capture audit: limit counts the newest sessions looked at"            "PYA ', limit=1' \"assert r == 1 and s['sB']['audit'] == (1, 1, True) and s['sA']['audit'] is None, (r, s)\""
+check "capture audit: the rest are read; an unended, missing or half-written one never raises" "PYA '' \"assert r == 2 and s['sA']['audit'] == (1, 1, False) and s['sF']['audit'] == (1, 1, False), (r, s)\""
+check "capture audit: a session still running, a missing transcript and no path are left unaudited" "PYA '' \"assert all(s[k]['audit'] is None for k in ('sC','sD','sE'))\""
+check "capture audit: a second run finds nothing new"                         "PYA '' \"assert r == 0\""
+check "capture audit: a record commit in the session's window marks it covered" "PYA '' \"assert s['sB']['audit'][2] is True and s['sA']['audit'][2] is False\""
+check "capture audit: the log holds counts, never the words"                  "! grep -q 'go with option a' '$CA/.git/ledger-capture/log.tsv'"
 
 # ---------------------------------------------------------------------------
 echo "14. the user-level session hook"

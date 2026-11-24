@@ -2228,6 +2228,72 @@ def capture_sessions(root):
     return out
 
 
+# --- the session audit: what the message hook cannot see, read from the transcript afterwards ---
+# A decision often arrives as a bare "a" or "ok" to a proposal Claude made, which no keyword in the
+# user's own message can show. The audit reads both sides of a session that has ended; it runs from
+# the digest (newest few) and from /ledger-tidy (all), so it never depends on a hook at exit.
+
+CAPTURE_GRACE = 15 * 60          # seconds after a session's last message before it counts as ended
+CAPTURE_PROPOSALS = ('which way', 'approve', 'my recommendation', 'want me to', "say so and i'll",
+                     'which approach', 'which do you prefer', 'your call')
+CAPTURE_ACCEPTS = ('a', 'b', 'c', 'yes', 'yep', 'ok', 'okay', 'approve', 'approved', 'go ahead',
+                   'do it', 'sounds good', 'agreed', 'lgtm')
+
+
+def _capture_accepts(text):
+    """A short reply (3 words or fewer, a trailing please/thanks aside) that agrees."""
+    words = re.sub(r"[^\w' ]+", ' ', text.lower()).split()
+    if words and words[-1] in ('please', 'thanks'):
+        words.pop()
+    return 0 < len(words) <= 3 and ' '.join(words) in CAPTURE_ACCEPTS
+
+
+def decision_turns(turns):
+    """(decision-like human turns, accepted proposals) in [(epoch, 'human'|'agent', text)]: a human
+    turn scoring as the message hook would, and a short agreeing human reply directly after an agent
+    turn that offered a choice or asked for approval."""
+    like = accepted = 0
+    prev = None
+    for ts, role, text in turns:
+        if role == 'human':
+            if capture_score(text)[0] >= CAPTURE_MIN_DEFAULT:
+                like += 1
+            if prev and prev[1] == 'agent' and _capture_accepts(text) \
+                    and any(ph in prev[2].lower() for ph in CAPTURE_PROPOSALS):
+                accepted += 1
+        prev = (ts, role, text)
+    return like, accepted
+
+
+def capture_audit(root, now=None, limit=None, max_bytes=5_000_000):
+    """Audit the sessions in the log that have ended (their last message is older than the grace)
+    and have not been audited, newest first, looking at no more than `limit` of them. Each gets one
+    `audit` row: decision-like turns, accepted proposals, and whether a record commit landed between
+    the session's start and its end. A session whose transcript is missing, unreadable, empty or
+    over `max_bytes` is skipped, never an error. -> how many were audited."""
+    now = datetime.datetime.now().timestamp() if now is None else now
+    sessions = capture_sessions(root)
+    todo = sorted(((s['last'], sid) for sid, s in sessions.items()
+                   if s['audit'] is None and s['last'] + CAPTURE_GRACE < now), reverse=True)
+    rows = []
+    for _, sid in todo[:limit]:
+        s = sessions[sid]
+        try:
+            if not s['transcript'] or os.path.getsize(s['transcript']) > max_bytes:
+                continue
+            turns = _transcript_turns(s['transcript'])
+        except OSError:
+            continue
+        if not turns:
+            continue
+        like, accepted = decision_turns(turns)
+        covered = capture_covered(root, min(s['first'], min(t[0] for t in turns)), s['last'] + CAPTURE_GRACE)
+        rows.append((round(now, 1), sid, s['transcript'], 'audit', 0,
+                     f'human={like};accepted={accepted};covered={int(covered)}'))
+    _append_log(capture_dir(root), rows)
+    return len(rows)
+
+
 def cmd_capture_hook(argv):
     """UserPromptSubmit: the hook's JSON on stdin -> the hook's JSON on stdout, or nothing."""
     import json
