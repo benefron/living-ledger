@@ -15,17 +15,17 @@
 # lives, whether to backfill) are made by the /ledger-init command before it calls
 # this script with the flags decided.
 #
-# ledger-template-version: 11
+# ledger-template-version: 12
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TPL="$SKILL_DIR/templates"
 COMMANDS_SRC="$SKILL_DIR/commands"
 QUIET=0
-LL_TEMPLATE_VERSION=11
+LL_TEMPLATE_VERSION=12
 say() { [ "$QUIET" = 1 ] || printf '%s\n' "$*"; }
 # the scripts a repo carries that git must record as executable (100755)
-LL_EXEC_FILES=".claude/hooks/digest.sh .claude/hooks/ledger-recall.sh .claude/hooks/ledger-sync.sh
+LL_EXEC_FILES=".claude/hooks/digest.sh .claude/hooks/ledger-recall.sh .claude/hooks/ledger-capture.sh .claude/hooks/ledger-sync.sh
 .claude/hooks/ledger-rollup.sh .claude/hooks/ledger-index-push.sh .claude/hooks/ledger-merge.py
 .claude/hooks/ledger-activate.sh .claude/hooks/ledger .githooks/commit-msg .githooks/post-commit
 .githooks/post-merge"
@@ -147,6 +147,11 @@ for matcher, msg in want:
 up = hooks.setdefault("UserPromptSubmit", [])
 if not has(up, None, "ledger-recall.sh"):
     up.append({"hooks": [{"type": "command", "command": cmd("ledger-recall.sh"), "timeout": 10}]})
+    added += 1
+
+# UserPromptSubmit: notice a conversation weighing decisions, and log whether a record followed.
+if not has(up, None, "ledger-capture.sh"):
+    up.append({"hooks": [{"type": "command", "command": cmd("ledger-capture.sh"), "timeout": 10}]})
     added += 1
 
 # SessionEnd: push the cross-repo index out before the session is gone.
@@ -312,6 +317,7 @@ print(",".join(sorted(p for p, n in c.items() if n >= 3)))
   mkdir -p "$repo/.claude/hooks"
   install -m 0755 "$TPL/hooks/digest.sh"        "$repo/.claude/hooks/digest.sh"
   install -m 0755 "$TPL/hooks/ledger-recall.sh" "$repo/.claude/hooks/ledger-recall.sh"
+  install -m 0755 "$TPL/hooks/ledger-capture.sh" "$repo/.claude/hooks/ledger-capture.sh"
   install -m 0755 "$TPL/hooks/ledger-sync.sh"   "$repo/.claude/hooks/ledger-sync.sh"
   install -m 0755 "$TPL/hooks/ledger-rollup.sh" "$repo/.claude/hooks/ledger-rollup.sh"
   install -m 0755 "$TPL/hooks/ledger-index-push.sh" "$repo/.claude/hooks/ledger-index-push.sh"
@@ -320,7 +326,7 @@ print(",".join(sorted(p for p, n in c.items() if n >= 3)))
   install -m 0755 "$TPL/hooks/ledger-activate.sh" "$repo/.claude/hooks/ledger-activate.sh"
   install -m 0755 "$TPL/hooks/ledger"             "$repo/.claude/hooks/ledger"
   install -m 0644 "$SKILL_DIR/lib/common.sh"    "$repo/.claude/hooks/_ledger_lib.sh"
-  say "· hooks       -> .claude/hooks/ (digest, recall, ledger-sync, ledger-rollup, index-push, merge driver, lib, parser)"
+  say "· hooks       -> .claude/hooks/ (digest, recall, capture, ledger-sync, ledger-rollup, index-push, merge driver, lib, parser)"
 
   # 3c. entry-wise merge driver: .gitattributes is committed, the driver is per-clone config
   local ga="$repo/.gitattributes" p

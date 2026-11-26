@@ -46,7 +46,7 @@ every clone and branch, so two machines or two branches can never hand out one i
 rebase or squash-merge leaves the id intact. Legacy sequential ids (`F-014`) are still parsed
 everywhere and never renumbered.
 
-ledger-template-version: 11
+ledger-template-version: 12
 """
 import datetime
 import hashlib
@@ -1277,6 +1277,13 @@ def tidy_report(ledger, root, max_open=22):
     if rec:
         out.append("## Recall threshold (calibration)")
         out.extend(rec)
+
+    # 10. capture: how often a ledger record followed a conversation that weighed decisions
+    cap = capture_report(root)
+    if cap:
+        out.append('')
+        out.append(f"## Capture ({'nudging' if capture_settings(root)[0] == 'nudge' else 'measuring'})")
+        out.extend(cap)
     return "\n".join(out).rstrip()
 
 
@@ -1827,7 +1834,11 @@ def recall_text(named, shown):
 
 
 def _log_recall(root, rows):
-    d = recall_dir(root)
+    _append_log(recall_dir(root), rows)
+
+
+def _append_log(d, rows):
+    """Append TSV rows to <d>/log.tsv, keeping the newest half once it passes 2 MB. Never raises."""
     if not d or not rows:
         return
     try:
@@ -2061,6 +2072,404 @@ def cmd_recall_stats(argv):
         or "No recalls logged in this clone yet."
 
 
+# --- capture nudge --------------------------------------------------------------
+# A conversation that explores or settles a decision reaches the ledger only if a commit follows,
+# and nothing noticed when it did not. A UserPromptSubmit hook scores each user message for
+# exploring-or-deciding language and logs it in the clone's git dir (never committed, and never the
+# prompt text); a lazy audit of ended sessions reads both sides of the transcript for what the
+# message hook cannot see; /ledger-tidy reports how often a record commit followed and proposes
+# switching CAPTURE=measure to nudge. See docs/superpowers/specs/2026-11-18-capture-nudge-design.md.
+
+CAPTURE_CUES = {
+    'direction': ('should we', 'what if', 'instead of', 'alternatively', 'which approach',
+                  'trade-off', 'tradeoff', 'which option', 'versus'),
+    'decision':  ("let's go with", 'we decided', 'scrap that', 'lock this in', "that's dead",
+                  'go with', 'changed my mind', 'final answer', "we're not doing", 'stop proposing'),
+    'open':      ('not sure', 'open question', 'do we need', 'how should we', 'worth it',
+                  'what do you think'),
+}
+CAPTURE_MIN_DEFAULT, CAPTURE_GAP_DEFAULT = 2, 10
+CAPTURE_MODES = ('measure', 'nudge', 'off')
+
+
+def capture_settings(root):
+    """-> (mode, min_score, gap). Anything unset or unrecognised is `measure`: silent, logging."""
+    def num(key, default):
+        try:
+            return int(float(_conf(root, key).strip('"\'') or default))
+        except ValueError:
+            return default
+    mode = _conf(root, 'CAPTURE').strip('"\'').lower()
+    return (mode if mode in CAPTURE_MODES else 'measure',
+            num('CAPTURE_MIN', CAPTURE_MIN_DEFAULT), num('CAPTURE_GAP', CAPTURE_GAP_DEFAULT))
+
+
+def capture_dir(root):
+    """Per-clone capture state, shared by the clone's worktrees; never committed."""
+    d = _git(root, 'rev-parse', '--git-common-dir').strip()
+    if not d:
+        return ''
+    return os.path.join(root, d, 'ledger-capture') if not os.path.isabs(d) else os.path.join(d, 'ledger-capture')
+
+
+def capture_countable(prompt):
+    """A message worth scoring: not a slash command, not pasted or system text, at least 4 words."""
+    s = (prompt or '').strip()
+    return len(s.split()) >= 4 and s[:1] not in ('/', '<')
+
+
+def capture_score(prompt):
+    """-> (score, cues): the distinct cue phrases a message contains; a decision cue counts 2."""
+    if not capture_countable(prompt):
+        return 0, []
+    low = prompt.lower().replace('’', "'")
+    score, cues = 0, []
+    for family, phrases in CAPTURE_CUES.items():
+        for ph in phrases:
+            if ph in low:
+                score += 2 if family == 'decision' else 1
+                cues.append(ph)
+    return score, cues
+
+
+CAPTURE_NUDGE = (
+    "Ledger capture — this conversation looks like it is weighing directions or decisions. "
+    "When something is settled, or is still open and worth keeping, offer in one line to record it "
+    "(a `Decision:` or `Opens:` trailer on an empty commit, or `/ledger-note`). Do not interrupt to "
+    "ask: offer at a natural pause, once, and never commit it without the user's yes.")
+
+
+def _capture_rows(root, session):
+    """This session's rows from the capture log, oldest first, as lists of 6 columns."""
+    try:
+        raw = io.open(os.path.join(capture_dir(root) or '', 'log.tsv'), encoding='utf-8').read().splitlines()
+    except OSError:
+        return []
+    rows = [l.split('\t') for l in raw]
+    return [c for c in rows if len(c) == 6 and c[1] == session]
+
+
+def _capture_first(root, session, default):
+    """When this session's first message was logged (`default` if none)."""
+    for c in _capture_rows(root, session):
+        try:
+            return float(c[0])
+        except ValueError:
+            continue
+    return default
+
+
+def _capture_nudge_due(root, session, gap):
+    """No nudge yet this session, or at least `gap` messages (this one included) since the last."""
+    since = 1                                   # this message
+    for c in reversed(_capture_rows(root, session)):
+        if c[3] == 'nudge':
+            return since >= gap
+        if c[3] == 'prompt':
+            since += 1
+    return True
+
+
+def capture_covered(root, start, end):
+    """Did a ledger record land between `start` and `end` (epoch seconds, inclusive)? A record is a
+    commit carrying an entry trailer — Decision, Finding, Opens, Fixed, Action, Retires — read with
+    the shared trailer reader. `start` is floored to the second: git dates have 1 s resolution, the
+    log 0.1 s, so a commit made in the same second as the message counts."""
+    lo = int(start)
+    raw = _git(root, 'log', '--all', '--no-merges', '-n', '2000', '--format=%ct%x1f%B%x1e')
+    for rec in raw.split('\x1e'):
+        ts, _, body = rec.strip('\n').partition('\x1f')
+        try:
+            t = int(ts)
+        except ValueError:
+            continue
+        if lo <= t <= end and any(l.split(':', 1)[0] in KINDS for l in trailer_lines(body)):
+            return True
+    return False
+
+
+def _capture_since(root):
+    """When CAPTURE= last changed in ledger.conf (epoch), or 0: older rows were gathered under another mode."""
+    t = _git(root, 'log', '-1', '--format=%ct', '-G', '^CAPTURE=', '--', '.claude/ledger.conf').strip()
+    return float(t) if t.isdigit() else 0.0
+
+
+_AUDIT_RE = re.compile(r'human=(\d+);accepted=(\d+);covered=([01])')
+
+
+def capture_sessions(root):
+    """The capture log by session, since the last change to CAPTURE= in ledger.conf (older rows
+    were gathered under another mode): {session: {transcript, first, last, prompts, hits[(epoch,
+    cues)], nudges, audit (decision_like, accepted, covered) | None, told}}. First/last are the
+    first and last logged messages. Messages with no session id ('-') are left out."""
+    try:
+        raw = io.open(os.path.join(capture_dir(root) or '', 'log.tsv'), encoding='utf-8').read().splitlines()
+    except OSError:
+        return {}
+    since = _capture_since(root)
+    out = {}
+    for line in raw:
+        c = line.split('\t')
+        if len(c) != 6 or c[1] == '-':
+            continue
+        try:
+            ts = float(c[0])
+        except ValueError:
+            continue
+        if ts < since:
+            continue
+        s = out.setdefault(c[1], {'transcript': '', 'first': ts, 'last': 0.0, 'prompts': 0, 'hits': [],
+                                  'nudges': 0, 'audit': None, 'told': False})
+        if c[2] and c[2] != '-':
+            s['transcript'] = c[2]
+        kind = c[3]
+        if kind == 'prompt':
+            s['prompts'] += 1
+            s['first'] = min(s['first'], ts)
+            s['last'] = max(s['last'], ts)
+        elif kind == 'hit':
+            s['hits'].append((ts, c[5]))
+        elif kind == 'nudge':
+            s['nudges'] += 1
+        elif kind == 'audit':
+            m = _AUDIT_RE.fullmatch(c[5])
+            if m:
+                s['audit'] = (int(m.group(1)), int(m.group(2)), m.group(3) == '1')
+        elif kind == 'told':
+            s['told'] = True
+    return out
+
+
+# --- the session audit: what the message hook cannot see, read from the transcript afterwards ---
+# A decision often arrives as a bare "a" or "ok" to a proposal Claude made, which no keyword in the
+# user's own message can show. The audit reads both sides of a session that has ended; it runs from
+# the digest (newest few) and from /ledger-tidy (all), so it never depends on a hook at exit.
+
+CAPTURE_GRACE = 15 * 60          # seconds after a session's last message before it counts as ended
+CAPTURE_PROPOSALS = ('which way', 'approve', 'my recommendation', 'want me to', "say so and i'll",
+                     'which approach', 'which do you prefer', 'your call')
+CAPTURE_ACCEPTS = ('a', 'b', 'c', 'yes', 'yep', 'ok', 'okay', 'approve', 'approved', 'go ahead',
+                   'do it', 'sounds good', 'agreed', 'lgtm')
+
+
+def _capture_accepts(text):
+    """A short reply (3 words or fewer, a trailing please/thanks aside) that agrees."""
+    words = re.sub(r"[^\w' ]+", ' ', text.lower()).split()
+    if words and words[-1] in ('please', 'thanks'):
+        words.pop()
+    return 0 < len(words) <= 3 and ' '.join(words) in CAPTURE_ACCEPTS
+
+
+def _decision_scan(turns):
+    """([decision-like human texts], [(proposal text, accepting reply)]) in [(epoch, role, text)]."""
+    like, pairs, prev = [], [], None
+    for ts, role, text in turns:
+        if role == 'human':
+            if capture_score(text)[0] >= CAPTURE_MIN_DEFAULT:
+                like.append(text)
+            if prev and prev[1] == 'agent' and _capture_accepts(text) \
+                    and any(ph in prev[2].lower() for ph in CAPTURE_PROPOSALS):
+                pairs.append((prev[2], text))
+        prev = (ts, role, text)
+    return like, pairs
+
+
+def decision_turns(turns):
+    """(decision-like human turns, accepted proposals): a human turn scoring as the message hook
+    would, and a short agreeing human reply directly after an agent turn that offered a choice or
+    asked for approval."""
+    like, pairs = _decision_scan(turns)
+    return len(like), len(pairs)
+
+
+def capture_audit(root, now=None, limit=None, max_bytes=5_000_000):
+    """Audit the sessions in the log that have ended (their last message is older than the grace)
+    and have not been audited, newest first, looking at no more than `limit` of them. Each gets one
+    `audit` row: decision-like turns, accepted proposals, and whether a record commit landed between
+    the session's start and its end. A session whose transcript is missing, unreadable, empty or
+    over `max_bytes` is skipped, never an error. -> how many were audited."""
+    now = datetime.datetime.now().timestamp() if now is None else now
+    sessions = capture_sessions(root)
+    todo = sorted(((s['last'], sid) for sid, s in sessions.items()
+                   if s['audit'] is None and s['last'] + CAPTURE_GRACE < now), reverse=True)
+    rows = []
+    for _, sid in todo[:limit]:
+        s = sessions[sid]
+        try:
+            if not s['transcript'] or os.path.getsize(s['transcript']) > max_bytes:
+                continue
+            turns = _transcript_turns(s['transcript'])
+        except OSError:
+            continue
+        if not turns:
+            continue
+        like, accepted = decision_turns(turns)
+        covered = capture_covered(root, min(s['first'], min(t[0] for t in turns)), s['last'] + CAPTURE_GRACE)
+        rows.append((round(now, 1), sid, s['transcript'], 'audit', 0,
+                     f'human={like};accepted={accepted};covered={int(covered)}'))
+    _append_log(capture_dir(root), rows)
+    return len(rows)
+
+
+# --- the report: what /ledger-tidy shows, and what it proposes -------------------------------
+
+CAPTURE_MIN_HITS, CAPTURE_MIN_SESSIONS = 30, 10     # enough to say something: hits, or finished sessions
+CAPTURE_TIDY_MAX_BYTES = 200_000_000                # the digest's audit stops at 5 MB; the tidy's does not
+CAPTURE_UNCOVERED_SHARE = 0.30                      # at least this many unrecorded → propose the nudge
+
+
+def _quote(text, n=160):
+    t = ' '.join(text.split())
+    return t if len(t) <= n else t[:n - 1].rstrip() + '\u2026'
+
+
+def _capture_samples(sessions, n_hits=5, n_pairs=3):
+    """Up to n_hits decision-like messages and n_pairs accepted proposals, newest first, read back
+    from the transcripts (locally; the log itself never held them)."""
+    hits, pairs = [], []
+    for s in sorted(sessions.values(), key=lambda v: v['last'], reverse=True):
+        if not s['transcript'] or (len(hits) >= n_hits and len(pairs) >= n_pairs):
+            continue
+        turns = _transcript_turns(s['transcript'])
+        humans = [(t, x) for t, r, x in turns if r == 'human']
+        for ts, _ in reversed(s['hits']):
+            near = min(humans, key=lambda h: abs(h[0] - ts), default=None)
+            if near and abs(near[0] - ts) <= 60 and len(hits) < n_hits:
+                hits.append(_quote(near[1]))
+        if s['audit'] and s['audit'][1]:
+            for prop, reply in reversed(_decision_scan(turns)[1]):
+                if len(pairs) < n_pairs:
+                    pairs.append(f'"{_quote(prop, 120)}" \u2192 "{_quote(reply, 20)}"')
+    return hits, pairs
+
+
+def capture_report(root):
+    """Plain-words lines for /ledger-tidy: how many messages looked like exploring or deciding, in
+    how many finished sessions a record followed, how many decisions arrived as a bare "ok", what to
+    check, and one proposal. [] when CAPTURE=off or nothing is logged."""
+    mode = capture_settings(root)[0]
+    if mode == 'off':
+        return []
+    capture_audit(root, max_bytes=CAPTURE_TIDY_MAX_BYTES)     # a tidy has no 20 s budget; long sessions are where decisions are
+    sessions = capture_sessions(root)
+    if not sessions:
+        return []
+    now = datetime.datetime.now().timestamp()
+    since = _capture_since(root)
+    msgs = sum(s['prompts'] for s in sessions.values())
+    hits = sum(len(s['hits']) for s in sessions.values())
+    rel = {k: s for k, s in sessions.items() if s['last'] + CAPTURE_GRACE < now
+           and (s['hits'] or (s['audit'] and s['audit'][0] + s['audit'][1] > 0))}
+    unrecorded = [k for k, s in rel.items()
+                  if not (s['audit'][2] if s['audit'] else capture_covered(root, s['first'], s['last'] + CAPTURE_GRACE))]
+    audited = [s['audit'] for s in sessions.values() if s['audit']]
+    like = sum(a[0] for a in audited)
+    accepted = sum(a[1] for a in audited)
+    when = datetime.date.fromtimestamp(since).isoformat() if since else 'the log began'
+    out = [f"- Since {when}: {msgs} message{'' if msgs == 1 else 's'} counted; {hits} of them looked like "
+           f"exploring or deciding ({round(100 * hits / msgs) if msgs else 0}%)."]
+    out.append(f"- {len(audited)} finished session{'' if len(audited) == 1 else 's'} read back. " + (
+        f"Of the {len(rel)} finished session{'' if len(rel) == 1 else 's'} with such messages or exchanges, "
+        f"{len(rel) - len(unrecorded)} had a ledger record committed during {'it' if len(rel) == 1 else 'them'} "
+        f"and {len(unrecorded)} did not." if rel else "None of them had such messages or exchanges yet."))
+    if like + accepted:
+        out.append(f"- {accepted} of the {like + accepted} decision-like exchanges "
+                   f"({round(100 * accepted / (like + accepted))}%) were a bare \"ok\" or \"a\" to something "
+                   "Claude proposed; the message hook cannot see those, only the read-back can.")
+    out.append("- A session where the only thing kept was a /ledger-note note or thought counts as "
+               "\"nothing recorded\": notes are not committed, so this cannot see them.")
+    sample_hits, sample_pairs = _capture_samples(sessions)
+    if sample_hits:
+        out.append("- Messages that looked like decisions (were they?):")
+        out.extend(f'  - "{h}"' for h in sample_hits)
+    if sample_pairs:
+        out.append("- Proposals Claude made that were accepted with a bare reply:")
+        out.extend(f'  - {p}' for p in sample_pairs)
+    share = len(unrecorded) / len(rel) if rel else 0.0
+    pct = round(100 * share)
+    if hits < CAPTURE_MIN_HITS and len(rel) < CAPTURE_MIN_SESSIONS:
+        out.append(f"- Keep measuring: {max(0, CAPTURE_MIN_HITS - hits)} more hits or "
+                   f"{max(0, CAPTURE_MIN_SESSIONS - len(rel))} more finished sessions like this are needed "
+                   "before this can say whether a nudge would help.")
+    elif mode == 'nudge':
+        out.append(f"- The nudge is on. {len(unrecorded)} of {len(rel)} finished sessions like this ({pct}%) "
+                   "still ended with nothing recorded.")
+    elif share >= CAPTURE_UNCOVERED_SHARE:
+        out.append(f"- Proposal: {len(unrecorded)} of {len(rel)} finished sessions like this ({pct}%) ended with "
+                   "nothing recorded, so a one-line nudge would reach real gaps. If the quoted messages above were "
+                   "decisions, set CAPTURE=nudge in .claude/ledger.conf and record \"Decision: capture nudge on "
+                   "\u2014 <these numbers>\". If most were not, raise CAPTURE_MIN instead.")
+    else:
+        out.append(f"- Proposal: leave it measuring (or raise CAPTURE_MIN if the quoted messages were mostly not "
+                   f"decisions): only {len(unrecorded)} of {len(rel)} finished sessions like this ({pct}%) ended "
+                   f"with nothing recorded, under the {round(100 * CAPTURE_UNCOVERED_SHARE)}% that would justify a nudge.")
+    return out
+
+
+def cmd_capture_stats(argv):
+    return "\n".join(capture_report(argv[0]))
+
+
+def capture_digest_note(root):
+    """The one line the next session's digest carries when the most recent audited session had
+    decision-like exchanges and no record commit: only in nudge mode, and once (a `told` row)."""
+    if capture_settings(root)[0] != 'nudge':
+        return ''
+    audited = [(s['last'], sid, s) for sid, s in capture_sessions(root).items() if s['audit']]
+    if not audited:
+        return ''
+    _, sid, s = max(audited, key=lambda a: a[0])
+    like, accepted, covered = s['audit']
+    n = like + accepted
+    if not n or covered or s['told']:
+        return ''
+    _append_log(capture_dir(root), [(round(datetime.datetime.now().timestamp(), 1), sid, s['transcript'], 'told', 0, '')])
+    return f"Last session: {n} decision-like exchange{'' if n == 1 else 's'}, no record commit \u2014 ask whether to record them."
+
+
+def cmd_capture_digest(argv):
+    """SessionStart: audit the newest few ended sessions (any mode but off), and in nudge mode
+    return the one line, or ''."""
+    root = argv[0]
+    if capture_settings(root)[0] == 'off':
+        return ''
+    capture_audit(root, limit=3)
+    return capture_digest_note(root)
+
+
+def cmd_capture_hook(argv):
+    """UserPromptSubmit: the hook's JSON on stdin -> the hook's JSON on stdout, or nothing."""
+    import json
+    root = argv[0]
+    try:
+        inp = json.load(sys.stdin)
+        prompt = inp.get('prompt') or ''
+        session = re.sub(r'\s', '', str(inp.get('session_id') or '')) or '-'
+        tr = str(inp.get('transcript_path') or '')
+    except Exception:
+        return ''
+    mode, min_score, gap = capture_settings(root)
+    ledger = _ledger_path(root)
+    if mode == 'off' or not isinstance(prompt, str) or not capture_countable(prompt) \
+            or not ledger or not os.path.exists(ledger):
+        return ''
+    score, cues = capture_score(prompt)
+    now = round(datetime.datetime.now().timestamp(), 1)
+    rows = [(now, session, tr, 'prompt', score, f'words={len(prompt.split())}')]
+    text = ''
+    if score >= min_score:
+        rows.append((now, session, tr, 'hit', score, '|'.join(cues)))
+        if mode == 'nudge' and session != '-' and _capture_nudge_due(root, session, gap) \
+                and not capture_covered(root, _capture_first(root, session, now), now):
+            rows.append((now, session, tr, 'nudge', score, ''))
+            text = CAPTURE_NUDGE
+    _append_log(capture_dir(root), rows)
+    if not text:
+        return ''
+    return json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
+                                              "additionalContext": text}})
+
+
 def cmd_id(argv):
     return hash_id(argv[0], ' '.join(argv[1:]))
 
@@ -2078,7 +2487,9 @@ def main():
           'lint': cmd_lint, 'id': cmd_id, 'check-msg': cmd_check_msg,
           'tidy-status': cmd_tidy_status, 'tidy-report': cmd_tidy_report,
           'share-state': cmd_share_state, 'cli': cmd_cli,
-          'recall-hook': cmd_recall_hook, 'recall-stats': cmd_recall_stats}.get(mode)
+          'recall-hook': cmd_recall_hook, 'recall-stats': cmd_recall_stats,
+          'capture-hook': cmd_capture_hook, 'capture-stats': cmd_capture_stats,
+          'capture-digest': cmd_capture_digest}.get(mode)
     if fn is None:
         sys.exit(2)
     s = fn(rest)

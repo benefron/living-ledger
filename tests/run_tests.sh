@@ -657,7 +657,7 @@ U3="$(newrepo v3)"; installed "$U3"
 echo 'AUDIENCE_SURFACE=paper/main.tex' >> "$U3/.claude/ledger.conf"
 sed -i.bak '/^SYNC_FROM=/d' "$U3/.claude/ledger.conf"; rm -f "$U3/.claude/ledger.conf.bak"
 git -C "$U3" rev-parse --short HEAD > "$U3/.claude/.ledger-sync"
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 3/' "$U3/.claude/ledger.conf" "$U3"/.claude/hooks/*
 git -C "$U3" add -A; commit "$U3" "x
 Ledger: none — simulate a v3 install"
 "$INSTALL" "$U3" --upgrade --quiet
@@ -672,29 +672,34 @@ python3 - "$U4/.claude/settings.json" <<'PYX'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p)); d['hooks'].pop('UserPromptSubmit', None); json.dump(d, open(p, 'w'))
 PYX
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 4/' "$U4/.claude/ledger.conf" "$U4"/.claude/hooks/* "$U4"/.githooks/*
 git -C "$U4" add -A; commit "$U4" "x
 Ledger: none — simulate a v4 install"
-check "v4 repo: the digest offers the upgrade to the version the skill ships" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v4; v11 is installed'"
+check "v4 repo: the digest offers the upgrade to the version the skill ships" "digest '$U4' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v4; v12 is installed'"
 "$INSTALL" "$U4" --upgrade --quiet
 check "v4 -> v11: recall hook installed and registered" "[ -x '$U4/.claude/hooks/ledger-recall.sh' ] && grep -q 'ledger-recall.sh' '$U4/.claude/settings.json' && [ -z \"\$(git -C '$U4' status --porcelain)\" ]"
 SHIPS="$(sed -n 's/.*ledger-template-version: \([0-9][0-9]*\).*/\1/p' "$SKILL/templates/ledger.conf" | head -1)"
 check "the version the skill ships (templates/ledger.conf) is the one install.sh stamps" "[ '$SHIPS' = \"\$(sed -n 's/^LL_TEMPLATE_VERSION=//p' '$INSTALL')\" ]"
 U8="$(newrepo v8)"; installed "$U8"
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 8/' "$U8/.claude/ledger.conf" "$U8"/.claude/hooks/* "$U8"/.githooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 8/' "$U8/.claude/ledger.conf" "$U8"/.claude/hooks/* "$U8"/.githooks/*
 git -C "$U8" add -A; commit "$U8" "x
 Ledger: none — simulate a v8 install"
-check "a v8 repo is offered v11, naming the decisions-record back-links" "digest '$U8' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v8; v11 is installed.*Superseded by'"
+check "a v8 repo is offered v12, naming the back-link fix" "digest '$U8' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v8; v12 is installed.*back-link'"
 U9="$(newrepo v9)"; installed "$U9"
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 9/' "$U9/.claude/ledger.conf" "$U9"/.claude/hooks/* "$U9"/.githooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 9/' "$U9/.claude/ledger.conf" "$U9"/.claude/hooks/* "$U9"/.githooks/*
 git -C "$U9" add -A; commit "$U9" "x
 Ledger: none — simulate a v9 install"
-check "a v9 repo is offered v11, naming the back-link fix" "digest '$U9' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v9; v11 is installed.*merely mentions the id'"
+check "a v9 repo is offered v12, naming the back-link fix" "digest '$U9' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v9; v12 is installed.*merely mentions the id'"
 U10="$(newrepo v10)"; installed "$U10"
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 10/' "$U10/.claude/ledger.conf" "$U10"/.claude/hooks/* "$U10"/.githooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 10/' "$U10/.claude/ledger.conf" "$U10"/.claude/hooks/* "$U10"/.githooks/*
 git -C "$U10" add -A; commit "$U10" "x
 Ledger: none — simulate a v10 install"
-check "a v10 repo is offered v11, naming the plain-sentence tidy report" "digest '$U10' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v10; v11 is installed.*full plain sentence with its id last'"
+check "a v10 repo is offered v12, naming the plain-sentence tidy report" "digest '$U10' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v10; v12 is installed.*full plain sentence with its id last'"
+U11="$(newrepo v11)"; installed "$U11"
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 11/' "$U11/.claude/ledger.conf" "$U11"/.claude/hooks/* "$U11"/.githooks/*
+git -C "$U11" add -A; commit "$U11" "x
+Ledger: none — simulate a v11 install"
+check "a v11 repo is offered v12, naming the capture nudge" "digest '$U11' | grep -q 'LEDGER UPGRADE AVAILABLE: this repo runs ledger template v11; v12 is installed.*capture'"
 
 DL="$(newrepo dotted)"; installed "$DL"
 python3 - "$DL/DECISIONS.md" <<'PYX'
@@ -1063,7 +1068,7 @@ FM="$(newrepo filemode)"; git -C "$FM" config core.fileMode false
 Ledger: none — installing the ledger tooling"
 check "git ignoring exec bits (Windows): a fresh install still commits its scripts as 100755" "[ -z \"\$(git -C '$FM' ls-tree -r HEAD -- .claude/hooks .githooks | grep -v '_ledger_' | grep -v '^100755')\" ]"
 git -C "$FM" rm -q --cached .claude/hooks/ledger-recall.sh; rm -f "$FM/.claude/hooks/ledger-recall.sh"
-perl -pi -e 's/ledger-template-version: 11/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
+perl -pi -e 's/ledger-template-version: 12/ledger-template-version: 5/' "$FM/.claude/ledger.conf" "$FM"/.claude/hooks/* "$FM"/.githooks/*
 git -C "$FM" add -A; commit "$FM" "x
 Ledger: none — simulate a v5 install"
 printf 'mine\n' > "$FM/user.txt"; git -C "$FM" add user.txt
@@ -1098,6 +1103,244 @@ if grep -qx 'en_US.ISO8859-1' "$WORK/locales"; then
 else
   echo "  skip (no en_US.ISO8859-1 locale on this system)"
 fi
+
+# ---------------------------------------------------------------------------
+echo "13l. the capture nudge: scoring, hook, audit, report"
+PYC() { PYTHONDONTWRITEBYTECODE=1 python3 -c "import sys; sys.path.insert(0,'$SKILL/templates/hooks'); import _ledger_parse as p; $1"; }
+check "capture: a direction + an open cue score 2+"   "PYC \"assert p.capture_score('should we use option a instead of b?')[0] >= 2\""
+check "capture: one decision cue counts double"        "PYC \"assert p.capture_score(\\\"ok let's go with the second one\\\")[0] >= 2\""
+check "capture: small talk scores 0"                   "PYC \"assert p.capture_score('ok that sounds good, please run it again now')[0] == 0\""
+check "capture: slash, pasted and short are not countable" "PYC \"assert not any(p.capture_countable(s) for s in ['/ledger-tidy should we', '<pasted_content>should we</pasted_content>', 'should we go'])\""
+check "capture: mode defaults to measure, unknown too" "PYC \"import tempfile,os; d=tempfile.mkdtemp(); os.makedirs(d+'/.claude'); open(d+'/.claude/ledger.conf','w').write('CAPTURE=bogus\\n'); assert p.capture_settings(d)[0]=='measure'\""
+
+CP="$(newrepo capture)"; installed "$CP"
+commit "$CP" "a
+
+Decision: the capture tests need a ledger to exist"
+sync_ "$CP"
+sleep 1.1       # a record in the same second as a message counts as covering it (by design): start a second later
+LOG="$CP/.git/ledger-capture/log.tsv"
+HIT="should we go with option a instead of option b for this?"
+CH() {  # CH <session> <prompt> -> the hook's additionalContext ('' when silent)
+  python3 -c 'import json,sys; print(json.dumps({"session_id": sys.argv[1], "prompt": sys.argv[2], "transcript_path": ""}))' "$1" "$2" 2>/dev/null \
+    | ( cd "$CP" && "$CP/.claude/hooks/ledger-capture.sh" ) \
+    | python3 -c 'import json,sys; t=sys.stdin.read(); print(json.loads(t)["hookSpecificOutput"]["additionalContext"] if t.strip() else "")'
+}
+nrows() {  # nrows <kind> [session] -> how many log rows of that kind (and session)
+  if [ -f "$LOG" ]; then awk -F'\t' -v k="$1" -v s="${2:-}" '$4==k && (s=="" || $2==s){n++} END{print n+0}' "$LOG"; else echo 0; fi
+}
+check "capture: settings.json registers the hook"  "python3 -c 'import json;d=json.load(open(\"$CP/.claude/settings.json\"));assert \"ledger-capture.sh\" in json.dumps(d[\"hooks\"][\"UserPromptSubmit\"])'"
+check "capture: the hook is committed executable"  "ghas '^100755' -C '$CP' ls-files -s .claude/hooks/ledger-capture.sh"
+# measure mode (the default): silent, logging
+OUT="$(CH s1 "$HIT")"
+check "capture measure: a decision-like message gets no output"   "[ -z \"\$OUT\" ]"
+check "capture measure: …it logs one prompt and one hit"          "[ \"\$(nrows prompt s1)\" = 1 ] && [ \"\$(nrows hit s1)\" = 1 ]"
+check "capture measure: …and never the prompt's own words"        "! grep -q 'option b' '$LOG'"
+CH s1 "ok that sounds good, please run it again now" >/dev/null
+check "capture measure: small talk logs a prompt but no hit"      "[ \"\$(nrows prompt s1)\" = 2 ] && [ \"\$(nrows hit s1)\" = 1 ]"
+CH s1 "/ledger-tidy should we go with this one" >/dev/null; CH s1 "<pasted_content>should we go with this one</pasted_content>" >/dev/null; CH s1 "should we go" >/dev/null
+check "capture measure: slash, pasted and 3-word messages leave no rows" "[ \"\$(nrows prompt s1)\" = 2 ]"
+# nudge mode, one nudge per CAPTURE_GAP prompts
+printf 'CAPTURE=nudge\nCAPTURE_GAP=2\n' >> "$CP/.claude/ledger.conf"
+BASE_ST="$(git -C "$CP" status --porcelain)"
+CH s2 "$HIT" > "$WORK/c1"; CH s2 "$HIT" > "$WORK/c2"; CH s2 "$HIT" > "$WORK/c3"
+check "capture nudge: the first hit nudges"                        "grep -q '^Ledger capture' '$WORK/c1'"
+check "capture nudge: …the next prompt, inside the gap, is silent" "[ -z \"\$(cat '$WORK/c2')\" ]"
+check "capture nudge: …and once the gap has passed it nudges again" "grep -q '^Ledger capture' '$WORK/c3'"
+check "capture nudge: each nudge is logged"                        "[ \"\$(nrows nudge s2)\" = 2 ]"
+# once a record commit exists, the conversation is being captured: no nudge for it
+CH s5 "$HIT" > "$WORK/d1"
+commit "$CP" "x
+
+Decision: use the second option"
+CH s5 "$HIT" > "$WORK/d2"; CH s5 "$HIT" > "$WORK/d3"
+sleep 1.1
+CH s6 "$HIT" > "$WORK/d4"
+check "capture nudge: the first hit of a session nudges"                      "grep -q '^Ledger capture' '$WORK/d1'"
+check "capture nudge: …not once a record commit has landed, even past the gap" "[ -z \"\$(cat '$WORK/d3')\" ]"
+check "capture nudge: …but a session that began after that record still nudges" "grep -q '^Ledger capture' '$WORK/d4'"
+# a message with no session id can be counted but never nudged (it cannot be rate-limited)
+OUT="$(python3 -c 'import json; print(json.dumps({"prompt": "should we go with option a instead of option b for this?"}))' | ( cd "$CP" && "$CP/.claude/hooks/ledger-capture.sh" ))"
+check "capture: no session id → logged under -, never nudged"     "[ -z \"\$OUT\" ] && [ \"\$(nrows hit -)\" = 1 ]"
+# the failures a real prompt stream brings
+T0=$SECONDS
+python3 -c 'import json; print(json.dumps({"session_id": "big", "prompt": "should we go with this " * 9000, "transcript_path": ""}))' \
+  | ( cd "$CP" && "$CP/.claude/hooks/ledger-capture.sh" ) > "$WORK/big" 2>&1; BIGRC=$?
+check "capture: a 200 KB prompt is handled quietly and fast"      "[ \$BIGRC -eq 0 ] && [ \$((SECONDS - T0)) -le 2 ]"
+echo '{{ not json' | ( cd "$CP" && "$CP/.claude/hooks/ledger-capture.sh" ) > "$WORK/bad" 2>&1; BADRC=$?
+check "capture: unparseable hook input is silent and exits 0"      "[ \$BADRC -eq 0 ] && [ ! -s '$WORK/bad' ]"
+check "capture: the hook writes nothing outside the git dir"      "[ \"\$(git -C '$CP' status --porcelain)\" = \"\$BASE_ST\" ]"
+N0="$(nrows prompt)"
+OUT="$(CLAUDE_CODE_ENTRYPOINT=sdk-cli CH s3 "$HIT")"
+check "capture: a headless run is silent and logs nothing"        "[ -z \"\$OUT\" ] && [ \"\$(nrows prompt)\" = \"\$N0\" ]"
+perl -pi -e 's/^CAPTURE=.*/CAPTURE=off/' "$CP/.claude/ledger.conf"
+OUT="$(CH s4 "$HIT")"
+check "capture: CAPTURE=off is silent and logs nothing"            "[ -z \"\$OUT\" ] && [ \"\$(nrows prompt)\" = \"\$N0\" ]"
+
+# coverage: did a ledger record land in a stretch of time? Commits carry fixed dates.
+CV="$(newrepo capturecov)"; installed "$CV"; T=1700000000
+GIT_COMMITTER_DATE="$((T+100)) +0000" commit "$CV" "c1
+
+Decision: a record inside the first window"
+GIT_COMMITTER_DATE="$((T+200)) +0000" commit "$CV" "c2
+
+Ledger: none — nothing recorded here"
+GIT_COMMITTER_DATE="$((T+300)) +0000" commit "$CV" "c3
+
+Closes: F-0000000"
+GIT_COMMITTER_DATE="$((T+1000)) +0000" commit "$CV" "c4
+
+Finding: a record later on"
+GIT_COMMITTER_DATE="$((T+2000)) +0000" commit "$CV" "c5
+
+Opens: a record in the same second as a hit"
+check "capture covered: a Decision trailer inside the window counts"       "PYC \"assert p.capture_covered('$CV', $T+50, $T+150)\""
+check "capture covered: a commit with no record trailer does not"          "PYC \"assert not p.capture_covered('$CV', $T+150, $T+250)\""
+check "capture covered: Closes alone is not a record"                      "PYC \"assert not p.capture_covered('$CV', $T+250, $T+350)\""
+check "capture covered: a record outside the window does not count"        "PYC \"assert not p.capture_covered('$CV', $T+500, $T+900)\""
+check "capture covered: Finding and Opens count too"                       "PYC \"assert p.capture_covered('$CV', $T+900, $T+1100) and p.capture_covered('$CV', $T+1900, $T+2100)\""
+check "capture covered: a record in the same second as the hit counts"     "PYC \"assert p.capture_covered('$CV', $T+2000.4, $T+2060)\""
+
+# the log read back, per session; rows from before the last CAPTURE= change in ledger.conf drop out
+mkdir -p "$CV/.git/ledger-capture"
+TAB=$'\t'
+{ printf '%s\n' \
+  "$T.1${TAB}s1${TAB}/tmp/tr1${TAB}prompt${TAB}0${TAB}words=6" \
+  "$((T+10)).2${TAB}s1${TAB}/tmp/tr1${TAB}prompt${TAB}3${TAB}words=9" \
+  "$((T+10)).2${TAB}s1${TAB}/tmp/tr1${TAB}hit${TAB}3${TAB}should we|instead of" \
+  "$((T+20)).0${TAB}s1${TAB}/tmp/tr1${TAB}nudge${TAB}3${TAB}" \
+  "$((T+50)).0${TAB}s1${TAB}/tmp/tr1${TAB}audit${TAB}0${TAB}human=2;accepted=1;covered=0" \
+  "$((T+60)).0${TAB}s1${TAB}/tmp/tr1${TAB}told${TAB}0${TAB}" \
+  "$T.1${TAB}s2${TAB}/tmp/tr2${TAB}prompt${TAB}0${TAB}words=5" \
+  "$T.5${TAB}-${TAB}-${TAB}prompt${TAB}0${TAB}words=5"; } > "$CV/.git/ledger-capture/log.tsv"
+check "capture sessions: rows are grouped per session, '-' left out" "PYC \"s = p.capture_sessions('$CV'); assert set(s) == {'s1','s2'}, s; a = s['s1']; assert a['transcript'] == '/tmp/tr1' and a['prompts'] == 2 and a['nudges'] == 1 and a['told'] is True and a['first'] == $T+0.1 and a['last'] == $T+10.2, a; assert a['hits'] == [($T+10.2, 'should we|instead of')], a\""
+check "capture sessions: an audit row is read as (decision-like, accepted, covered)" "PYC \"s = p.capture_sessions('$CV'); assert s['s1']['audit'] == (2, 1, False) and s['s2']['audit'] is None and s['s2']['told'] is False\""
+CF="$(newrepo capturecut)"; installed "$CF"
+mkdir -p "$CF/.git/ledger-capture"
+{ printf '%s\n' \
+  "$((T+10)).0${TAB}old${TAB}/tmp/o${TAB}prompt${TAB}0${TAB}words=5" \
+  "$((T+500)).0${TAB}new${TAB}/tmp/n${TAB}prompt${TAB}0${TAB}words=5"; } > "$CF/.git/ledger-capture/log.tsv"
+printf 'CAPTURE=nudge\n' >> "$CF/.claude/ledger.conf"; git -C "$CF" add -A
+GIT_COMMITTER_DATE="$((T+100)) +0000" commit "$CF" "switch capture on
+
+Ledger: none — a settings change for the test"
+check "capture sessions: rows from before the last CAPTURE= change are dropped" "PYC \"assert set(p.capture_sessions('$CF')) == {'new'}\""
+
+# the audit: what the message hook cannot see, read back from the transcript of an ended session
+check "capture audit: an offer accepted with a bare 'a' is an accepted proposal" "PYC \"assert p.decision_turns([(1,'agent','Which way do you want to go? My recommendation is A.'),(2,'human','a')]) == (0,1)\""
+check "capture audit: 'Approved.' after a request for approval counts"           "PYC \"assert p.decision_turns([(1,'agent','Please approve the design.'),(2,'human','Approved.')]) == (0,1)\""
+check "capture audit: a reply with no proposal before it is not an acceptance"   "PYC \"assert p.decision_turns([(1,'agent','Done. Tests pass.'),(2,'human','a')]) == (0,0)\""
+check "capture audit: a long reply is not a bare acceptance"                     "PYC \"assert p.decision_turns([(1,'agent','Which way?'),(2,'human','yes please go ahead with it now')]) == (0,0)\""
+check "capture audit: nor is one that follows another agent turn"                "PYC \"assert p.decision_turns([(1,'agent','Which way?'),(2,'agent','Working on it.'),(3,'human','ok')]) == (0,0)\""
+check "capture audit: a decision-like human turn is counted"                     "PYC \"assert p.decision_turns([(1,'human',\\\"let's go with option a instead of b\\\")]) == (1,0)\""
+
+CA="$(newrepo captureaudit)"; installed "$CA"
+TA=1700100000; TF=1700200000; TB=1700250000; TC=1700300000; TD=1700000500; NOWA=$((TC + 100))
+mktr() {  # mktr <file> <epoch> <role:text>... -> a transcript, one turn per argument, 10 s apart
+  python3 - "$@" <<'PYEOF'
+import datetime, json, sys
+out, t = sys.argv[1], float(sys.argv[2])
+with open(out, 'w', encoding='utf-8') as f:
+    for i, a in enumerate(sys.argv[3:]):
+        role, _, text = a.partition(':')
+        ts = datetime.datetime.fromtimestamp(t + 10 * i, datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
+        if role == 'agent':
+            f.write(json.dumps({"type": "assistant", "timestamp": ts, "message": {"content": [{"type": "text", "text": text}]}}) + '\n')
+        else:
+            f.write(json.dumps({"type": "user", "timestamp": ts, "message": {"content": text}}) + '\n')
+PYEOF
+}
+SESS=(agent:'Which way do you want to go? My recommendation is A.' human:a "human:let's go with option a instead of b for now")
+mktr "$WORK/trA.jsonl" $TA "${SESS[@]}"; mktr "$WORK/trB.jsonl" $TB "${SESS[@]}"; mktr "$WORK/trF.jsonl" $TF "${SESS[@]}"
+printf '{"type":"user","timestamp":"20' >> "$WORK/trF.jsonl"                  # a half-written last line
+GIT_COMMITTER_DATE="$((TB + 15)) +0000" commit "$CA" "x
+
+Decision: a record made while session B was running"
+mkdir -p "$CA/.git/ledger-capture"
+lrow() { printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$@"; }
+{ lrow "$((TA+10)).0" sA "$WORK/trA.jsonl" prompt 0 words=3;  lrow "$((TA+20)).0" sA "$WORK/trA.jsonl" prompt 4 words=9
+  lrow "$((TB+10)).0" sB "$WORK/trB.jsonl" prompt 0 words=3;  lrow "$((TB+20)).0" sB "$WORK/trB.jsonl" prompt 4 words=9
+  lrow "$((TF+10)).0" sF "$WORK/trF.jsonl" prompt 0 words=3;  lrow "$((TF+20)).0" sF "$WORK/trF.jsonl" prompt 4 words=9
+  lrow "$((TC+10)).0" sC "$WORK/trC.jsonl" prompt 0 words=6                                    # still running at NOWA
+  lrow "$((TD+10)).0" sD "$WORK/no-such-transcript.jsonl" prompt 0 words=6                        # transcript is gone
+  lrow "$((TD+20)).0" sE - prompt 0 words=6; } > "$CA/.git/ledger-capture/log.tsv"                # no transcript path at all
+mktr "$WORK/trC.jsonl" $TC "${SESS[@]}"
+PYA() { PYC "import sys; r=p.capture_audit('$CA', now=$NOWA$1); s=p.capture_sessions('$CA'); $2"; }
+check "capture audit: a transcript over the size cap is skipped, not read"   "PYA ', max_bytes=10' \"assert r == 0 and all(v['audit'] is None for v in s.values())\""
+check "capture audit: limit counts the newest sessions looked at"            "PYA ', limit=1' \"assert r == 1 and s['sB']['audit'] == (1, 1, True) and s['sA']['audit'] is None, (r, s)\""
+check "capture audit: the rest are read; an unended, missing or half-written one never raises" "PYA '' \"assert r == 2 and s['sA']['audit'] == (1, 1, False) and s['sF']['audit'] == (1, 1, False), (r, s)\""
+check "capture audit: a session still running, a missing transcript and no path are left unaudited" "PYA '' \"assert all(s[k]['audit'] is None for k in ('sC','sD','sE'))\""
+check "capture audit: a second run finds nothing new"                         "PYA '' \"assert r == 0\""
+check "capture audit: a record commit in the session's window marks it covered" "PYA '' \"assert s['sB']['audit'][2] is True and s['sA']['audit'][2] is False\""
+check "capture audit: the log holds counts, never the words"                  "! grep -q 'go with option a' '$CA/.git/ledger-capture/log.tsv'"
+
+# the report, in plain words, and what it proposes
+lrow "$((TA+20)).3" sA "$WORK/trA.jsonl" hit 5 'go with|instead of' >> "$CA/.git/ledger-capture/log.tsv"
+PYR() {  # PYR <min hits> <min sessions> <repo> <python using the report text t>
+  PYC "p.CAPTURE_MIN_HITS=$1; p.CAPTURE_MIN_SESSIONS=$2; t='\n'.join(p.capture_report('$3')); $4"; }
+CK="$(newrepo capturekeep)"; installed "$CK"; TK=1700400000
+mktr "$WORK/trK.jsonl" $TK "${SESS[@]}"; mkdir -p "$CK/.git/ledger-capture"
+{ lrow "$((TK+10)).0" sK "$WORK/trK.jsonl" prompt 0 words=3; lrow "$((TK+20)).0" sK "$WORK/trK.jsonl" prompt 5 words=9
+  lrow "$((TK+20)).1" sK "$WORK/trK.jsonl" hit 5 'go with|instead of'; } > "$CK/.git/ledger-capture/log.tsv"
+CL="$(newrepo capturecovered)"; installed "$CL"; TL=1700500000
+mktr "$WORK/trL.jsonl" $TL "${SESS[@]}"; mkdir -p "$CL/.git/ledger-capture"
+{ lrow "$((TL+10)).0" sL "$WORK/trL.jsonl" prompt 0 words=3; lrow "$((TL+20)).0" sL "$WORK/trL.jsonl" prompt 5 words=9
+  lrow "$((TL+20)).1" sL "$WORK/trL.jsonl" hit 5 'go with|instead of'; } > "$CL/.git/ledger-capture/log.tsv"
+GIT_COMMITTER_DATE="$((TL + 15)) +0000" commit "$CL" "x
+
+Decision: recorded while session L was running"
+check "capture report: too little data → keep measuring, and says how much more" "PYR 5 5 '$CK' \"assert 'Keep measuring' in t and '4 more hits' in t and 'CAPTURE=nudge' not in t, t\""
+check "capture report: most sessions ended with nothing recorded → set CAPTURE=nudge" "PYR 2 2 '$CA' \"assert 'CAPTURE=nudge' in t and 'Decision: capture nudge on' in t, t\""
+check "capture report: every session had a record → leave it measuring"           "PYR 1 1 '$CL' \"assert 'leave it' in t.lower() and 'CAPTURE=nudge' not in t, t\""
+check "capture report: a decision-like message is quoted from the transcript"     "PYR 2 2 '$CA' \"assert 'go with option a instead of b for now' in t, t\""
+check "capture report: an accepted proposal is quoted with its reply"             "PYR 2 2 '$CA' \"assert 'Which way do you want to go' in t, t\""
+check "capture report: the share of bare acceptances is stated"                    "PYR 2 2 '$CA' \"assert '50%' in t and 'bare' in t, t\""
+check "capture report: it says notes and thoughts cannot be seen"                  "PYR 2 2 '$CA' \"assert '/ledger-note' in t, t\""
+check "capture report: rows before the last CAPTURE= change are not counted"       "PYR 2 2 '$CF' \"assert '1 message counted' in t and '2 messages' not in t, t\""
+sync_ "$CA"
+python3 "$SKILL/templates/hooks/_ledger_parse.py" tidy-report "$CA/LEDGER.md" "$CA" > "$WORK/treport" 2>/dev/null
+python3 "$SKILL/templates/hooks/_ledger_parse.py" capture-stats "$CA" > "$WORK/cstats" 2>/dev/null
+python3 "$SKILL/templates/hooks/_ledger_parse.py" tidy-report "$CP/LEDGER.md" "$CP" > "$WORK/treport_off" 2>/dev/null
+python3 "$SKILL/templates/hooks/_ledger_parse.py" capture-stats "$CP" > "$WORK/cstats_off" 2>/dev/null
+check "capture report: the tidy report has a Capture section, headed by the mode" "grep -q '^## Capture (measuring)' '$WORK/treport'"
+check "capture report: capture-stats prints the same lines"                        "grep -q 'Keep measuring' '$WORK/cstats' && grep -q 'Keep measuring' '$WORK/treport'"
+check "capture report: CAPTURE=off puts nothing in either"                         "! grep -q 'Capture' '$WORK/treport_off' && [ ! -s '$WORK/cstats_off' ]"
+
+# the next session's digest says when a decision slipped past (nudge mode); measure mode only audits
+krows() { awk -F'\t' -v k="$2" '$4==k{n++} END{print n+0}' "$1/.git/ledger-capture/log.tsv" 2>/dev/null || echo 0; }
+dg_repo() {  # dg_repo <name> <epoch> -> a ledger repo with one ended session (a proposal, a bare "a", a decision), no record
+  local r; r="$(newrepo "$1")"; installed "$r"
+  commit "$r" "a
+
+Decision: the digest tests need a ledger to exist"; sync_ "$r"
+  mktr "$WORK/tr$1.jsonl" "$2" "${SESS[@]}"; mkdir -p "$r/.git/ledger-capture"
+  { lrow "$(($2+10)).0" s1 "$WORK/tr$1.jsonl" prompt 0 words=3; lrow "$(($2+20)).0" s1 "$WORK/tr$1.jsonl" prompt 5 words=9; } > "$r/.git/ledger-capture/log.tsv"
+  printf '%s\n' "$r"
+}
+CD="$(dg_repo capturedigest 1700600000)"
+DG1="$(digest "$CD")"
+check "capture digest: measure mode says nothing, but audits the ended session" "[[ \"\$DG1\" != *'Last session'* ]] && [ \"\$(krows '$CD' audit)\" = 1 ]"
+printf 'CAPTURE=nudge\n' >> "$CD/.claude/ledger.conf"
+DG2="$(digest "$CD")"; DG3="$(digest "$CD")"
+check "capture digest: nudge mode names the unrecorded exchanges"              "[[ \"\$DG2\" == *'Last session: 2 decision-like exchanges, no record commit'* ]]"
+check "capture digest: …once"                                                  "[[ \"\$DG3\" != *'Last session'* ]] && [ \"\$(krows '$CD' told)\" = 1 ]"
+CD2="$(dg_repo capturedigestcov 1700700000)"; printf 'CAPTURE=nudge\n' >> "$CD2/.claude/ledger.conf"
+GIT_COMMITTER_DATE="$((1700700000 + 15)) +0000" commit "$CD2" "x
+
+Decision: recorded while the session ran"
+DG4="$(digest "$CD2")"
+check "capture digest: a session that had a record commit says nothing"        "[[ \"\$DG4\" != *'Last session'* ]] && [ \"\$(krows '$CD2' audit)\" = 1 ]"
+CD3="$(dg_repo capturedigestheadless 1700800000)"; printf 'CAPTURE=nudge\n' >> "$CD3/.claude/ledger.conf"
+DG5="$(CLAUDE_CODE_ENTRYPOINT=sdk-cli digest "$CD3")"
+check "capture digest: a headless run is silent and audits nothing"            "[ -z \"\$DG5\" ] && [ \"\$(krows '$CD3' audit)\" = 0 ]"
+CD4="$(dg_repo capturedigestbig 1700900000)"; printf 'CAPTURE=nudge\n' >> "$CD4/.claude/ledger.conf"
+python3 -c 'import json,sys; l=json.dumps({"type":"user","timestamp":"2023-11-25T08:00:00Z","message":{"content":"x"}})+"\n"; sys.stdout.write(l*(6000000//len(l)+1))' > "$WORK/trcapturedigestbig.jsonl"
+T0=$SECONDS; DG6="$(digest "$CD4")"
+check "capture digest: a 6 MB transcript is skipped, quickly, without an audit"  "[ \"\$(krows '$CD4' audit)\" = 0 ] && [ \$((SECONDS - T0)) -le 8 ] && [[ \"\$DG6\" != *'Last session'* ]]"
+CB="$(dg_repo capturebigreport 1701000000)"
+python3 -c 'import json,sys; l=json.dumps({"type":"user","timestamp":"2023-11-25T08:00:00Z","message":{"content":"x"}})+"\n"; sys.stdout.write(l*(6000000//len(l)+1))' >> "$WORK/trcapturebigreport.jsonl"
+python3 "$SKILL/templates/hooks/_ledger_parse.py" capture-stats "$CB" > "$WORK/cbig" 2>/dev/null
+check "capture report: the tidy reads a long session the digest would skip"      "[ \"\$(krows '$CB' audit)\" = 1 ]"
 
 # ---------------------------------------------------------------------------
 echo "14. the user-level session hook"

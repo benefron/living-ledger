@@ -46,7 +46,10 @@ files in the repo that keep their own lists (retired framings, concerns, status 
 the **re-proposals caught** since the last tidy (commits the gate refused for re-adopting a
 retired or rejected approach or restating a live entry, and dead ends recall surfaced that were
 then cited; report them, there is nothing to apply), and the **recall threshold**: how much of what prompt-time recall showed was cited, how much it held
-back that got looked up anyway, and whether `RECALL_MIN` should move. These are
+back that got looked up anyway, and whether `RECALL_MIN` should move, and last the **capture**
+section: how many messages looked like exploring or deciding, how many finished sessions had a ledger
+record committed during them, how many decisions arrived as a bare "ok" or "a", with samples to judge
+whether they were decisions, and whether to switch `CAPTURE` from `measure` to `nudge`. These are
 heuristics: read each entry (`grep -n -A6 '^## <id> '`) and, where needed, its commit
 (`git show <sha>`) before proposing anything. `--report-only`: show the report and stop.
 
@@ -85,6 +88,7 @@ Proposals, and how each is applied:
 | stale rule | update or delete the file under `.claude/rules/` |
 | other registers | bring them in line with the ledger, or replace their lists with a pointer to it |
 | recall threshold | only when the report proposes a change: set `RECALL_MIN=<new>` in `.claude/ledger.conf`, and add `Decision: recall threshold <old> → <new> — <the report's reason and numbers>` |
+| capture mode | only when the report proposes it, after the user has judged the quoted samples: set `CAPTURE=nudge` in `.claude/ledger.conf` (or raise `CAPTURE_MIN` if most samples were not decisions), and add `Decision: capture nudge on — <the report's numbers>` |
 
 Wait for approve / edit / decline on each batch. Never apply anything unapproved.
 
