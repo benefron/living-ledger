@@ -1337,6 +1337,10 @@ CD4="$(dg_repo capturedigestbig 1700900000)"; printf 'CAPTURE=nudge\n' >> "$CD4/
 python3 -c 'import json,sys; l=json.dumps({"type":"user","timestamp":"2023-11-25T08:00:00Z","message":{"content":"x"}})+"\n"; sys.stdout.write(l*(6000000//len(l)+1))' > "$WORK/trcapturedigestbig.jsonl"
 T0=$SECONDS; DG6="$(digest "$CD4")"
 check "capture digest: a 6 MB transcript is skipped, quickly, without an audit"  "[ \"\$(krows '$CD4' audit)\" = 0 ] && [ \$((SECONDS - T0)) -le 8 ] && [[ \"\$DG6\" != *'Last session'* ]]"
+CB="$(dg_repo capturebigreport 1701000000)"
+python3 -c 'import json,sys; l=json.dumps({"type":"user","timestamp":"2023-11-25T08:00:00Z","message":{"content":"x"}})+"\n"; sys.stdout.write(l*(6000000//len(l)+1))' >> "$WORK/trcapturebigreport.jsonl"
+python3 "$SKILL/templates/hooks/_ledger_parse.py" capture-stats "$CB" > "$WORK/cbig" 2>/dev/null
+check "capture report: the tidy reads a long session the digest would skip"      "[ \"\$(krows '$CB' audit)\" = 1 ]"
 
 # ---------------------------------------------------------------------------
 echo "14. the user-level session hook"

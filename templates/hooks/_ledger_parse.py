@@ -2314,6 +2314,7 @@ def capture_audit(root, now=None, limit=None, max_bytes=5_000_000):
 # --- the report: what /ledger-tidy shows, and what it proposes -------------------------------
 
 CAPTURE_MIN_HITS, CAPTURE_MIN_SESSIONS = 30, 10     # enough to say something: hits, or finished sessions
+CAPTURE_TIDY_MAX_BYTES = 200_000_000                # the digest's audit stops at 5 MB; the tidy's does not
 CAPTURE_UNCOVERED_SHARE = 0.30                      # at least this many unrecorded → propose the nudge
 
 
@@ -2349,7 +2350,7 @@ def capture_report(root):
     mode = capture_settings(root)[0]
     if mode == 'off':
         return []
-    capture_audit(root)
+    capture_audit(root, max_bytes=CAPTURE_TIDY_MAX_BYTES)     # a tidy has no 20 s budget; long sessions are where decisions are
     sessions = capture_sessions(root)
     if not sessions:
         return []
