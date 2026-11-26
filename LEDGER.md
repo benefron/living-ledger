@@ -128,6 +128,10 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## D-2ec0a01 · CLOSED · decision · - · 2026-11-26
+template v12 ships the capture nudge in measure mode; it is switched to nudge only at a tidy, from the report's numbers
+→ commit 568ca77
+
 ## D-812807d · CLOSED · decision · docs/superpowers · 2026-11-24
 the capture nudge is implemented natively in this session as seven test-first tasks, one commit each, all in _ledger_parse.py beside the recall code, and is not pushed until the owner says so
 → commit 32740d1
@@ -142,6 +146,7 @@ capture is a message-scoring hook plus a lazy post-session transcript audit, bot
 ↔ d457562 feat: capture audit — read ended sessions for what the message hook misses
 ↔ 2dfeea9 feat: the tidy report says how often decisions went unrecorded
 ↔ 91dfe11 feat: the next session's digest says when decisions slipped past
+↔ 568ca77 chore: template v12 — the capture nudge, measuring
 
 ## D-a6a9756 · CLOSED · decision · docs/superpowers · 2026-11-24
 the post-session audit runs from the digest and from tidy over ended sessions, not from a SessionEnd hook, which cannot show anything and does not run when a terminal is killed
@@ -459,3 +464,4 @@ capture still needs a commit — a decision nobody states in a session never rea
 → commit 9d9fbe4
 · tidied 2026-11-18: kept — still true; the skill's trigger phrases and the global empty-commit rule reduce it but nothing enforces it
 ↔ 9926f74 docs: design for the capture nudge, approved
+↔ 568ca77 chore: template v12 — the capture nudge, measuring

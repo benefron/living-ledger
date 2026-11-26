@@ -316,4 +316,5 @@ Do not hand-edit between the markers.
 | 2026-11-24 | D-a9e7ae1 | capture is a message-scoring hook plus a lazy post-session transcript audit, both silent and measuring by default; the nudge is switched on at tidy only when sessions with decision-like exchanges mostly had no record commit | `9926f74` |
 | 2026-11-24 | D-a6a9756 | the post-session audit runs from the digest and from tidy over ended sessions, not from a SessionEnd hook, which cannot show anything and does not run when a terminal is killed | `9926f74` |
 | 2026-11-24 | D-812807d | the capture nudge is implemented natively in this session as seven test-first tasks, one commit each, all in _ledger_parse.py beside the recall code, and is not pushed until the owner says so | `32740d1` |
+| 2026-11-26 | D-2ec0a01 | template v12 ships the capture nudge in measure mode; it is switched to nudge only at a tidy, from the report's numbers | `568ca77` |
 <!-- DECISIONS_LOG_END -->
