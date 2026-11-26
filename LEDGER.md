@@ -128,6 +128,10 @@ restore a trailer-born one. Mark it `SUPERSEDED` instead.
 <!-- newest first; ledger-sync.sh inserts directly below this marker -->
 <!-- ENTRIES_START -->
 
+## F-bb014eb · CLOSED · finding · - · 2026-11-26
+the capture report's audit skipped sessions with transcripts over 5 MB, the longest and most decision-heavy ones, because it shared the digest's size cap
+→ commit 2240c58
+
 ## D-2ec0a01 · CLOSED · decision · - · 2026-11-26
 template v12 ships the capture nudge in measure mode; it is switched to nudge only at a tidy, from the report's numbers
 → commit 568ca77
@@ -147,6 +151,7 @@ capture is a message-scoring hook plus a lazy post-session transcript audit, bot
 ↔ 2dfeea9 feat: the tidy report says how often decisions went unrecorded
 ↔ 91dfe11 feat: the next session's digest says when decisions slipped past
 ↔ 568ca77 chore: template v12 — the capture nudge, measuring
+↔ 2240c58 fix: the tidy's capture audit reads long sessions
 
 ## D-a6a9756 · CLOSED · decision · docs/superpowers · 2026-11-24
 the post-session audit runs from the digest and from tidy over ended sessions, not from a SessionEnd hook, which cannot show anything and does not run when a terminal is killed
