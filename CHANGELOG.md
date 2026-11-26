@@ -5,6 +5,28 @@ running an older template is flagged at session start with `LEDGER UPGRADE AVAIL
 `/ledger-init --upgrade` (or `install.sh <repo> --upgrade`) upgrades it in one commit without
 rewriting or renumbering any entry.
 
+## v12 — 2026-11-26
+
+A conversation that explores or settles a decision reaches the ledger only if a commit follows, and
+nothing noticed when it did not (F-5eb5445). v12 measures that first, then can nudge.
+
+- **A capture hook** (`ledger-capture.sh`, on every user message). It scores the message for
+  exploring-or-deciding language ("should we", "what if", "let's go with") and logs it in this
+  clone's git dir — cue words and the transcript path, never the prompt, never a tracked file.
+  `CAPTURE=measure` (the default) is silent; `CAPTURE=nudge` also tells Claude, at most once per
+  `CAPTURE_GAP` (10) messages and not once a record has landed, to offer to record what is settled
+  or open; `CAPTURE=off` does nothing. Headless runs do nothing.
+- **A session audit.** Ended sessions are read back from their transcripts (by the digest, newest
+  three, and by the tidy, all of them) for what the message hook cannot see: a proposal accepted
+  with a bare "ok" or "a". With `nudge`, the next digest says the last session ended with decisions
+  unrecorded, once.
+- **A Capture section in `/ledger-tidy`**, in plain words: messages counted, finished sessions with
+  and without a record committed during them, the share of bare acceptances, quoted samples to
+  judge, and one proposal — keep measuring (under 30 hits or 10 finished sessions), switch to
+  `nudge` (at least 30% unrecorded), or leave it.
+- Upgrading adds the hook in `measure` mode and changes nothing you can see. A session kept only
+  as a `/ledger-note` note or thought reads as unrecorded: notes are not committed.
+
 ## v11 — 2026-11-02
 
 From a real repo (pressure-simulation, a 76-item tidy): the report listed `- F-4b19474 · sparse bundles break the decoder

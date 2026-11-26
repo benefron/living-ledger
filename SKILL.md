@@ -128,6 +128,16 @@ Read them before answering. When one shapes your answer, **cite its id** — tha
 `/ledger-tidy` measures whether recall is worth its tokens and calibrates its threshold. Do not
 cite ids you did not use. If a recalled entry is wrong or stale, say so.
 
+### A "Ledger capture" line arrives with the user's message
+
+A hook noticed the conversation weighing directions or decisions (`CAPTURE=nudge` in
+`.claude/ledger.conf`; the default, `measure`, is silent and only logs). When something is settled,
+or is still open and worth keeping, offer **once, in one line**, to record it — a `Decision:` or
+`Opens:` trailer on an empty commit, or `/ledger-note` — at a natural pause, and never commit
+without the user's yes. The hook logs only in this clone's git dir (cue words, never the prompt),
+and `/ledger-tidy` reports how often a record followed and proposes switching `measure` to `nudge`.
+The next session's digest may also say the last one ended with decisions unrecorded: ask.
+
 ### "note that …" / "remember that …"
 
 Run `/ledger-note <text>` — a `note` (observation) or `thought` (thinking aloud, visibly *not*
